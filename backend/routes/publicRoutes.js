@@ -1,0 +1,25 @@
+// backend/routes/publicRoutes.js (BERKAS BARU)
+const express = require('express');
+const router = express.Router();
+const motorController = require('../controllers/motorController');
+const testimonialController = require('../controllers/testimonialController');
+const reservationController = require('../controllers/reservationController'); // Impor controller reservasi
+
+// --- RUTE PUBLIK (Tidak perlu autentikasi JWT atau role) ---
+
+// Mendapatkan semua motor yang tersedia untuk publik
+router.get('/motors/available', motorController.getAvailableMotors);
+
+// Mendapatkan semua testimoni yang disetujui (untuk publik)
+router.get('/testimonials/approved', testimonialController.getApprovedTestimonials);
+
+// Mengirim testimoni baru (membutuhkan user_id, jadi pengguna harus login)
+// Rute ini bisa saja dilindungi oleh verifyToken jika Anda hanya ingin user login yang bisa submit
+// Untuk saat ini, kita asumsikan user_id dikirim dari frontend setelah login
+router.post('/testimonials', testimonialController.createTestimonial);
+
+// Membuat reservasi baru (membutuhkan user_id, jadi pengguna harus login)
+// Rute ini bisa saja dilindungi oleh verifyToken jika Anda hanya ingin user login yang bisa buat
+router.post('/reservations', reservationController.createReservation);
+
+module.exports = router;
