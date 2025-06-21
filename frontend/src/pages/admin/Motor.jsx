@@ -8,6 +8,7 @@ import '../../assets/css/admin/sidebar.css';
 import '../../assets/css/admin/motor.css';     
 import '../../assets/css/global.css';
 
+
 const Motor = () => {
     const [motorData, setMotorData] = useState([]);
     const [motorStats, setMotorStats] = useState({

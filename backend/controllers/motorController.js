@@ -2,6 +2,35 @@
 const Motor = require('../models/Motor');
 const fs = require('fs').promises;
 const path = require('path');
+const db = require('../config/db'); 
+
+
+const checkMotorFutureReservations = async (req, res) => {
+    let connection;
+    try {
+        const { id } = req.params; // ID motor yang akan diperiksa
+        const currentDate = new Date().toISOString().slice(0, 10); // Tanggal hari ini YYYY-MM-DD
+
+        connection = await db.getConnection();
+        const [rows] = await connection.execute(
+            `SELECT COUNT(id) AS futureBookingsCount
+            FROM reservasi
+            WHERE motor_id = ?
+            AND tanggal_selesai >= ? -- Reservasi berakhir hari ini atau di masa depan
+            AND status IN ('pending', 'confirmed')`,
+            [id, currentDate]
+        );
+
+        const hasFutureBookings = rows[0].futureBookingsCount > 0;
+        res.json({ success: true, hasFutureBookings: hasFutureBookings, count: rows[0].futureBookingsCount });
+
+    } catch (error) {
+        console.error('Error in checkMotorFutureReservations:', error);
+        res.status(500).json({ success: false, message: 'Gagal memeriksa reservasi masa depan motor.', error: error.message });
+    } finally {
+        if (connection) connection.release();
+    }
+};
 
 const getAllMotors = async (req, res) => {
     try {
@@ -54,6 +83,50 @@ const getMotorById = async (req, res) => {
             success: false,
             message: `Failed to retrieve motor: ${error.message}`
         });
+    }
+};
+
+const getMotorAvailability = async (req, res) => {
+    let connection;
+    try {
+        const { motorId } = req.params;
+        const { start_date, end_date } = req.query;
+
+        if (!motorId || !start_date || !end_date) {
+            return res.status(400).json({ success: false, message: 'Motor ID, tanggal mulai, dan tanggal akhir wajib diisi.' });
+        }
+
+        const startDateObj = new Date(start_date);
+        const endDateObj = new Date(end_date);
+
+        if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+            return res.status(400).json({ success: false, message: 'Format tanggal tidak valid.' });
+        }
+
+        connection = await db.getConnection();
+
+        const [reservations] = await connection.execute(
+            `SELECT tanggal_mulai, tanggal_selesai
+            FROM reservasi
+            WHERE motor_id = ?
+            AND status IN ('pending', 'confirmed', 'completed')
+            AND (
+                (tanggal_mulai <= ? AND tanggal_selesai >= ?)
+            )`,
+            [
+                motorId,
+                endDateObj.toISOString().slice(0, 10),
+                startDateObj.toISOString().slice(0, 10)
+            ]
+        );
+
+        res.json({ success: true, data: { motorId: motorId, reservations: reservations } });
+
+    } catch (error) {
+        console.error('Error in getMotorAvailability:', error);
+        res.status(500).json({ success: false, message: 'Gagal mengambil ketersediaan motor.', error: error.message });
+    } finally {
+        if (connection) connection.release();
     }
 };
 
@@ -230,20 +303,245 @@ const getMotorStats = async (req, res) => {
     }
 };
 
+
+// Perbaikan untuk motorController.js - getAvailableMotors function
+
 const getAvailableMotors = async (req, res) => {
+    let connection;
     try {
-        const filters = {
-            status: 'available' // Hanya ambil yang tersedia
-            // Filter lain seperti brand, search bisa ditambahkan dari req.query jika diperlukan
-        };
-        // *** PERBAIKAN DI SINI: Ubah Motor.findAll menjadi Motor.getAll ***
-        const motors = await Motor.getAll(filters); 
-        res.json({ success: true, data: motors, message: 'Available motors retrieved successfully.' });
+        const { tanggal_mulai, lama_sewa, brand } = req.query;
+        let tanggalSelesaiFormatted;
+
+        // Validasi input tanggal dan lama sewa
+        if (tanggal_mulai && lama_sewa) {
+            const startDate = new Date(tanggal_mulai);
+            const duration = parseInt(lama_sewa);
+
+            // Validasi format tanggal
+            if (isNaN(startDate.getTime())) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Format tanggal_mulai tidak valid. Gunakan format YYYY-MM-DD.' 
+                });
+            }
+
+            // Validasi lama sewa
+            if (isNaN(duration) || duration <= 0) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Lama_sewa tidak valid (harus angka positif).' 
+                });
+            }
+
+            // Validasi tanggal tidak boleh di masa lalu
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            startDate.setHours(0, 0, 0, 0);
+            
+            if (startDate < today) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Tanggal mulai sewa tidak boleh di masa lalu.' 
+                });
+            }
+
+            // Hitung tanggal selesai
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + duration);
+            tanggalSelesaiFormatted = endDate.toISOString().slice(0, 10);
+        }
+
+        connection = await db.getConnection();
+
+        // Base query untuk motor yang tersedia
+        let query = `
+            SELECT
+                m.id,
+                m.brand,
+                m.type,
+                m.price,
+                m.specs,
+                m.status,
+                m.description,
+                m.gambar_motor,
+                m.image,
+                m.created_at,
+                m.updated_at,
+                -- Hitung jumlah reservasi aktif untuk motor ini
+                (SELECT COUNT(*) 
+                 FROM reservasi r 
+                 WHERE r.motor_id = m.id 
+                 AND r.status IN ('pending', 'confirmed')) as active_reservations
+            FROM motors m
+            WHERE m.status = 'available'
+        `;
+        const params = [];
+
+        // Filter berdasarkan brand jika disediakan
+        if (brand && brand !== 'all' && brand.trim() !== '') {
+            query += ' AND LOWER(m.brand) = LOWER(?)';
+            params.push(brand.trim());
+        }
+
+        // Logika pengecekan overlap reservasi jika tanggal dan lama sewa disediakan
+        if (tanggal_mulai && tanggalSelesaiFormatted) {
+            query += `
+                AND m.id NOT IN (
+                    SELECT DISTINCT r.motor_id
+                    FROM reservasi r
+                    WHERE r.status IN ('pending', 'confirmed', 'completed')
+                    AND NOT (
+                        -- Tidak ada overlap jika:
+                        -- 1. Reservasi berakhir sebelum permintaan dimulai
+                        r.tanggal_selesai < ? 
+                        OR 
+                        -- 2. Reservasi dimulai setelah permintaan berakhir
+                        r.tanggal_mulai > ?
+                    )
+                )
+            `;
+            params.push(tanggal_mulai, tanggalSelesaiFormatted);
+        }
+
+        // Urutkan berdasarkan brand dan type
+        query += ' ORDER BY m.brand ASC, m.type ASC';
+
+        console.log('Executing query:', query);
+        console.log('With parameters:', params);
+
+        const [motors] = await connection.execute(query, params);
+
+        // Log untuk debugging
+        console.log(`Found ${motors.length} available motors`);
+        if (tanggal_mulai && lama_sewa) {
+            console.log(`For period: ${tanggal_mulai} to ${tanggalSelesaiFormatted} (${lama_sewa} days)`);
+        }
+
+        // Tambahkan informasi tambahan untuk setiap motor
+        const motorsWithAvailability = motors.map(motor => ({
+            ...motor,
+            is_available_for_period: tanggal_mulai && lama_sewa ? true : null,
+            requested_period: tanggal_mulai && lama_sewa ? {
+                start_date: tanggal_mulai,
+                end_date: tanggalSelesaiFormatted,
+                duration_days: parseInt(lama_sewa)
+            } : null
+        }));
+
+        res.json({ 
+            success: true, 
+            data: motorsWithAvailability, 
+            message: 'Available motors retrieved successfully.',
+            filter_applied: {
+                date_filter: !!(tanggal_mulai && lama_sewa),
+                brand_filter: !!brand,
+                total_found: motors.length
+            }
+        });
+
     } catch (error) {
         console.error('Error in getAvailableMotors:', error);
-        res.status(500).json({ success: false, message: 'Gagal mengambil daftar motor yang tersedia.', error: error.message });
+        res.status(500).json({ 
+            success: false, 
+            message: 'Gagal mengambil daftar motor yang tersedia.', 
+            error: error.message 
+        });
+    } finally {
+        if (connection) connection.release();
     }
 };
+
+const checkDateOverlap = (start1, end1, start2, end2) => {
+    // Konversi string tanggal ke Date object jika diperlukan
+    const date1Start = new Date(start1);
+    const date1End = new Date(end1);
+    const date2Start = new Date(start2);
+    const date2End = new Date(end2);
+    
+    // Tidak ada overlap jika:
+    // - Periode 1 berakhir sebelum periode 2 dimulai, ATAU
+    // - Periode 2 berakhir sebelum periode 1 dimulai
+    return !(date1End < date2Start || date2End < date1Start);
+};
+
+const getMotorAvailabilityDetails = async (req, res) => {
+    let connection;
+    try {
+        const { id } = req.params;
+        const { start_date, end_date } = req.query;
+
+        connection = await db.getConnection();
+
+        // Ambil detail motor
+        const [motorResult] = await connection.execute(
+            'SELECT * FROM motors WHERE id = ? AND status = "available"',
+            [id]
+        );
+
+        if (motorResult.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Motor tidak ditemukan atau tidak tersedia.'
+            });
+        }
+
+        const motor = motorResult[0];
+
+        // Ambil semua reservasi untuk motor ini dalam rentang waktu tertentu
+        let reservationQuery = `
+            SELECT 
+                id,
+                tanggal_mulai,
+                tanggal_selesai,
+                status,
+                user_id
+            FROM reservasi 
+            WHERE motor_id = ? 
+            AND status IN ('pending', 'confirmed', 'completed')
+        `;
+        const queryParams = [id];
+
+        if (start_date && end_date) {
+            reservationQuery += ' AND NOT (tanggal_selesai < ? OR tanggal_mulai > ?)';
+            queryParams.push(start_date, end_date);
+        }
+
+        reservationQuery += ' ORDER BY tanggal_mulai ASC';
+
+        const [reservations] = await connection.execute(reservationQuery, queryParams);
+
+        // Tentukan apakah motor tersedia untuk periode yang diminta
+        let isAvailable = true;
+        if (start_date && end_date) {
+            isAvailable = reservations.length === 0;
+        }
+
+        res.json({
+            success: true,
+            data: {
+                motor: motor,
+                reservations: reservations,
+                is_available_for_requested_period: isAvailable,
+                requested_period: start_date && end_date ? {
+                    start_date,
+                    end_date
+                } : null
+            },
+            message: 'Motor availability details retrieved successfully.'
+        });
+
+    } catch (error) {
+        console.error('Error in getMotorAvailabilityDetails:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Gagal mengambil detail ketersediaan motor.',
+            error: error.message
+        });
+    } finally {
+        if (connection) connection.release();
+    }
+};
+
 
 module.exports = {
     getAllMotors,
@@ -253,5 +551,9 @@ module.exports = {
     deleteMotor,
     bulkDeleteMotors,
     getMotorStats,
-    getAvailableMotors // Pastikan ini diekspor
+    getAvailableMotors,
+    checkMotorFutureReservations,
+    getMotorAvailabilityDetails,
+    checkDateOverlap,
+    getMotorAvailability
 };

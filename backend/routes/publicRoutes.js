@@ -11,6 +11,7 @@ const { verifyToken, authorizeRole } = require('../middlewares/authMiddleware');
 
 // Mendapatkan semua motor yang tersedia untuk publik
 router.get('/motors/available', motorController.getAvailableMotors);
+router.get('/motors/:motorId/availability', motorController.getMotorAvailability);
 
 // Mendapatkan semua testimoni yang disetujui (untuk publik)
 router.get('/testimonials/approved', testimonialController.getApprovedTestimonials);
@@ -19,6 +20,9 @@ router.get('/testimonials/approved', testimonialController.getApprovedTestimonia
 // Rute ini bisa saja dilindungi oleh verifyToken jika Anda hanya ingin user login yang bisa submit
 // Untuk saat ini, kita asumsikan user_id dikirim dari frontend setelah login
 router.post('/testimonials', testimonialController.createTestimonial);
+
+router.get('/available', motorController.getAvailableMotors);
+router.get('/:id/availability', motorController.getMotorAvailabilityDetails);
 
 // Membuat reservasi baru (membutuhkan user_id, jadi pengguna harus login)
 // Rute ini bisa saja dilindungi oleh verifyToken jika Anda hanya ingin user login yang bisa buat

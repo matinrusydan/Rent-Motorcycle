@@ -138,57 +138,80 @@ const getAllPayments = async (req, res) => {
 };
 
 const updatePaymentStatus = async (req, res) => {
+    let connection;
     try {
-        const { id } = req.params;
+        const { id } = req.params; // id pembayaran
         const { status, admin_notes } = req.body;
 
-        // Gunakan `verified` sebagai status persetujuan, `rejected` untuk penolakan
         const validStatuses = ['pending', 'verified', 'rejected'];
-        if (!validStatuses.includes(status)) {
+        if (!status || !validStatuses.includes(status.toLowerCase())) {
             return res.status(400).json({ success: false, message: 'Status pembayaran tidak valid.' });
         }
 
-        const payment = await Payment.findById(id);
+        connection = await db.getConnection();
+        await connection.beginTransaction(); // Mulai transaksi untuk atomicity
+
+        const [paymentRows] = await connection.execute(
+            'SELECT reservasi_id FROM pembayaran WHERE id = ?',
+            [id]
+        );
+        const payment = paymentRows[0];
+
         if (!payment) {
+            await connection.rollback();
             return res.status(404).json({ success: false, message: 'Pembayaran tidak ditemukan.' });
         }
 
-        const connection = await db.getConnection();
-        await connection.beginTransaction(); // Mulai transaksi
+        // Perbarui status pembayaran di tabel `pembayaran`
+        await connection.execute(
+            'UPDATE pembayaran SET status_pembayaran = ?, admin_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [status.toLowerCase(), admin_notes, id]
+        );
 
-        try {
-            // Perbarui status pembayaran
+        let newReservationStatus;
+        let newMotorStatus = null; // Status motor yang akan diatur
+
+        if (status.toLowerCase() === 'verified') {
+            newReservationStatus = 'confirmed';
+            newMotorStatus = 'rented'; // Motor disewa jika pembayaran diverifikasi
+        } else if (status.toLowerCase() === 'rejected') {
+            newReservationStatus = 'cancelled'; // Jika pembayaran ditolak, batalkan reservasi
+            newMotorStatus = 'available'; // Motor kembali tersedia jika dibatalkan
+        }
+
+        // Perbarui status reservasi
+        if (newReservationStatus) {
             await connection.execute(
-                'UPDATE pembayaran SET status_pembayaran = ?, admin_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                [status, admin_notes, id]
+                'UPDATE reservasi SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [newReservationStatus, payment.reservasi_id]
             );
 
-            // Perbarui status reservasi berdasarkan status pembayaran
-            if (status === 'verified') {
-                await connection.execute(
-                    'UPDATE reservasi SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                    ['confirmed', payment.reservasi_id]
+            // Perbarui status motor terkait jika diperlukan
+            if (newMotorStatus) {
+                const [reservationDetails] = await connection.execute(
+                    'SELECT motor_id FROM reservasi WHERE id = ?',
+                    [payment.reservasi_id]
                 );
-            } else if (status === 'rejected') {
-                await connection.execute(
-                    'UPDATE reservasi SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                    ['cancelled', payment.reservasi_id] // Atau 'pending' jika Anda ingin user upload ulang
-                );
+                const motorId = reservationDetails[0]?.motor_id;
+                if (motorId) {
+                    await connection.execute(
+                        'UPDATE motors SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                        [newMotorStatus, motorId]
+                    );
+                    console.log(`Motor ${motorId} status diubah menjadi '${newMotorStatus}'`);
+                }
             }
-
-            await connection.commit(); // Komit transaksi
-            res.json({ success: true, message: `Status pembayaran diperbarui menjadi ${status}.` });
-
-        } catch (transactionError) {
-            await connection.rollback(); // Rollback jika ada kesalahan
-            throw transactionError;
-        } finally {
-            if (connection) connection.release();
         }
+
+        await connection.commit(); // Komit transaksi
+        res.status(200).json({ success: true, message: `Status pembayaran diperbarui menjadi ${status}.` });
 
     } catch (error) {
         console.error('Error in updatePaymentStatus (admin):', error);
+        if (connection) await connection.rollback(); // Rollback jika ada error
         res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat memperbarui status pembayaran.', error: error.message });
+    } finally {
+        if (connection) connection.release();
     }
 };
 

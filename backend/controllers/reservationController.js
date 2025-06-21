@@ -63,39 +63,56 @@ const getAllReservations = async (req, res) => {
 const updateReservationStatus = async (req, res) => {
     let connection;
     try {
-        const { id } = req.params;
-        const { status } = req.body; // Status baru yang dikirim dari frontend
+        const { id } = req.params; // ID reservasi
+        const { status } = req.body; // Status baru
 
-        // Definisi status yang valid
-        const validStatuses = ['pending', 'confirmed', 'cancelled', 'completed']; // <<< SESUAIKAN DENGAN STATUS YANG ANDA GUNAKAN
-
-        // Validasi status
+        const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled'];
         if (!status || !validStatuses.includes(status.toLowerCase())) {
             return res.status(400).json({ success: false, message: 'Status tidak valid.' });
         }
 
         connection = await db.getConnection();
+        await connection.beginTransaction(); // Mulai transaksi
 
-        // Periksa apakah reservasi ada
-        const [existingReservation] = await connection.execute(
-            'SELECT id FROM reservasi WHERE id = ?',
+        const [reservationRows] = await connection.execute(
+            'SELECT motor_id, status FROM reservasi WHERE id = ?',
             [id]
         );
+        const reservation = reservationRows[0];
 
-        if (existingReservation.length === 0) {
+        if (!reservation) {
+            await connection.rollback();
             return res.status(404).json({ success: false, message: 'Reservasi tidak ditemukan.' });
         }
 
-        // Perbarui status reservasi
+        // Perbarui status reservasi di tabel `reservasi`
         await connection.execute(
-            'UPDATE reservasi SET status = ?, updated_at = NOW() WHERE id = ?',
-            [status.toLowerCase(), id] // Pastikan status disimpan dalam huruf kecil jika validasi case-sensitive
+            'UPDATE reservasi SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [status.toLowerCase(), id]
         );
 
+        // Logika untuk mengubah status motor di tabel `motors`
+        let newMotorStatus = null;
+        if (status.toLowerCase() === 'completed' || status.toLowerCase() === 'cancelled') {
+            newMotorStatus = 'available'; // Motor kembali tersedia
+        }
+        // Jika status diubah dari pending ke confirmed, ini seharusnya sudah dihandle oleh paymentController
+        // Jadi, kita hanya fokus pada 'completed' dan 'cancelled' di sini.
+
+        if (newMotorStatus && reservation.motor_id) {
+            await connection.execute(
+                'UPDATE motors SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [newMotorStatus, reservation.motor_id]
+            );
+            console.log(`Motor ${reservation.motor_id} status diubah menjadi '${newMotorStatus}' karena reservasi ${id} ${status.toLowerCase()}.`);
+        }
+
+        await connection.commit(); // Komit transaksi
         res.status(200).json({ success: true, message: `Status reservasi ${id} berhasil diubah menjadi ${status}.` });
 
     } catch (error) {
         console.error('Error in updateReservationStatus:', error);
+        if (connection) await connection.rollback();
         res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat mengubah status reservasi.', error: error.message });
     } finally {
         if (connection) connection.release();

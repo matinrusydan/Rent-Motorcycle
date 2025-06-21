@@ -17,6 +17,7 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const testimonialRoutes = require('./routes/testimonialRoutes')
 const dashboardRoutes = require('./routes/dashboardRoutes'); 
 
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -52,6 +53,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin/testimonials', testimonialRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes); 
+app.use('/api', publicRoutes);
 
 // Middleware
 app.use((err, req, res, next) => {

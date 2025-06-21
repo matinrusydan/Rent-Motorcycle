@@ -16,5 +16,6 @@ router.post('/', upload.single('gambar_motor'), motorController.createMotor);
 router.get('/:id', motorController.getMotorById);
 router.put('/:id', upload.single('gambar_motor'), motorController.updateMotor);
 router.delete('/:id', motorController.deleteMotor);
+router.get('/:id/future-reservations', motorController.checkMotorFutureReservations);
 
 module.exports = router;
