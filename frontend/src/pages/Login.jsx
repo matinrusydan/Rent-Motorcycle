@@ -238,7 +238,19 @@ const Login = () => {
                 {/* Left Side - Hero/Image Section */}
                 <div className="auth-left">
                     <div className="auth-hero">
-                        <div className="auth-illustration">🏍️</div>
+                        <div className="auth-illustration">
+                            <img 
+                                src="/images/imageLogin.jpg" 
+                                alt="RentalMotor Illustration" 
+                                className="login-image"
+                                onError={(e) => {
+                                    // Fallback if image fails to load
+                                    e.target.style.display = 'none';
+                                    e.target.nextElementSibling.style.display = 'block';
+                                }}
+                            />
+                            <div className="fallback-icon" style={{display: 'none'}}>🏍️</div>
+                        </div>
                         <h1>RentalMotor</h1>
                         <p>Solusi terbaik untuk kebutuhan rental motor Anda dengan layanan terpercaya dan kualitas terjamin</p>
                     </div>
@@ -335,12 +347,6 @@ const Login = () => {
                         <div className="auth-links">
                             <p>Belum punya akun? <Link to="/register">Daftar di sini</Link></p>
                             <p><Link to="/">Kembali ke Beranda</Link></p>
-                        </div>
-                        
-                        <div className="demo-accounts">
-                            <h4>Demo Akun:</h4>
-                            <p><strong>Admin:</strong> admin@rentalmotor.com / admin123</p>
-                            <p><strong>User:</strong> user@email.com / password123</p>
                         </div>
                     </div>
                 </div>

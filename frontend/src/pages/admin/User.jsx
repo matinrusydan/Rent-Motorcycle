@@ -6,7 +6,6 @@ import axios from 'axios';
 import Sidebar from '../../components/admin/Sidebar.jsx'; 
 
 // CSS yang relevan
-import '../../assets/css/admin/dashboard.css';
 import '../../assets/css/admin/sidebar.css';
 import '../../assets/css/admin/user.css';
 import '../../assets/css/global.css';
@@ -131,30 +130,6 @@ const UserAdmin = () => {
                 <Sidebar />
                 <div id="content-wrapper" className="d-flex flex-column">
                     <div id="content">
-                        <nav className="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
-                            <ul className="navbar-nav ml-auto">
-                                <li className="nav-item dropdown no-arrow">
-                                    <a className="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
-                                        data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                        <span className="mr-2 d-none d-lg-inline text-gray-600 small">Admin</span>
-                                        <img className="img-profile rounded-circle"
-                                            src="http://via.placeholder.com/40x40" alt="Profile" />
-                                    </a>
-                                    <div className="dropdown-menu dropdown-menu-right shadow animated--grow-in"
-                                        aria-labelledby="userDropdown">
-                                        <Link className="dropdown-item" to="/admin/settings">
-                                            <i className="fas fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i>
-                                            Settings
-                                        </Link>
-                                        <div className="dropdown-divider"></div>
-                                        <a className="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#logoutModal">
-                                            <i className="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
-                                            Logout
-                                        </a>
-                                    </div>
-                                </li>
-                            </ul>
-                        </nav>
                         <div className="loading-container">
                             <div className="loading-spinner">⏳</div>
                             <p>Memuat data pengguna...</p>
@@ -178,31 +153,6 @@ const UserAdmin = () => {
 
             <div id="content-wrapper" className="d-flex flex-column">
                 <div id="content">
-                    <nav className="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
-                        <ul className="navbar-nav ml-auto">
-                            <li className="nav-item dropdown no-arrow">
-                                <a className="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
-                                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                    <span className="mr-2 d-none d-lg-inline text-gray-600 small">Admin</span>
-                                    <img className="img-profile rounded-circle"
-                                        src="http://via.placeholder.com/40x40" alt="Profile" />
-                                </a>
-                                <div className="dropdown-menu dropdown-menu-right shadow animated--grow-in"
-                                    aria-labelledby="userDropdown">
-                                    <Link className="dropdown-item" to="/admin/settings">
-                                        <i className="fas fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i>
-                                        Settings
-                                    </Link>
-                                    <div className="dropdown-divider"></div>
-                                    <a className="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#logoutModal">
-                                        <i className="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
-                                        Logout
-                                    </a>
-                                </div>
-                            </li>
-                        </ul>
-                    </nav>
-
                     <div className="container-fluid user-management-container">
                         <div className="user-management-header d-sm-flex align-items-center justify-content-between mb-4">
                             <h1 className="h3 mb-0 text-gray-800">Manajemen Pengguna</h1>

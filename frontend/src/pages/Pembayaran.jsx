@@ -1,88 +1,104 @@
 // frontend/src/pages/Pembayaran.jsx
 
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom'; // ✅ Tambahkan useLocation
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom'; // ✅ Tambahkan useNavigate
+import axios from 'axios'; // ✅ Import Axios
 import Header from '../components/Header.jsx';
 import Footer from '../components/Footer.jsx';
-import '../assets/css/pembayaran.css'; // Pastikan jalur impor CSS sesuai
-import '../assets/css/global.css'; // Jika global.css diperlukan
+import '../assets/css/pembayaran.css';
+import '../assets/css/global.css';
 
 const Pembayaran = () => {
-    // State untuk detail reservasi (saat ini dummy, nanti dari backend/props)
     const [reservationDetails, setReservationDetails] = useState({
-        motor: 'Honda Beat',
-        nama: 'Budi Santoso',
-        tanggal: '21 Juni 2025',
-        lama: '3 hari',
-        total: 'Rp 240.000'
+        motor: 'Loading...',
+        nama: 'Loading...',
+        tanggal: 'Loading...',
+        lama: 'Loading...',
+        total: 'Rp 0'
     });
 
-    const [buktiPembayaran, setBuktiPembayaran] = useState(null); // State untuk file bukti pembayaran
+    const [buktiPembayaran, setBuktiPembayaran] = useState(null);
     const [catatanTambahan, setCatatanTambahan] = useState('');
     const [fileNameDisplay, setFileNameDisplay] = useState('');
     const [uploadSuccessVisible, setUploadSuccessVisible] = useState(false);
+    const [uploadLoading, setUploadLoading] = useState(false); // State untuk loading upload
+    const [error, setError] = useState(null); // State untuk error
+    const [reservationId, setReservationId] = useState(null); // State untuk menyimpan reservationId
 
-    const location = useLocation(); // ✅ Inisialisasi useLocation
+    const location = useLocation();
+    const navigate = useNavigate(); // ✅ Inisialisasi useNavigate
 
-    // Fungsi helper untuk menghitung total harga (diambil dari js/script.js)
-    const hitungTotalHarga = (tipeMotor, lamaSewa) => {
-        const hargaPerHari = {
-            'Beat': 80000,
-            'Vario': 90000,
-            'PCX': 120000,
-            'Mio': 75000,
-            'NMAX': 110000,
-            'Aerox': 100000,
-            'Address': 85000,
-            'NEX': 70000,
-            'Scoopy': 85000, // Menambahkan tipe motor yang mungkin ada di Index.jsx
-            'ADV 150': 130000,
-            'Genio': 95000,
-            'Forza': 150000,
-            'CB150R': 120000,
-            'CRF150L': 140000,
-            'Lexi': 95000,
-            'FreeGo': 90000,
-            'Gear': 85000,
-            'XMAX': 140000,
-            'R15': 125000,
-            'MT-15': 130000,
-            'Burgman': 120000,
-            'GSX-R150': 135000,
-            'GSX-S150': 125000,
-            'Satria F150': 115000,
-            'V-Strom 250': 160000,
-            'Inazuma': 140000,
-            'Jimny': 90000
-        };
-        
-        const harga = hargaPerHari[tipeMotor] || 0;
-        return harga * parseInt(lamaSewa);
+    const getApiUrl = () => {
+        return import.meta.env.VITE_APP_API_URL || 'http://localhost:5000';
     };
+
+    // Fungsi untuk memuat detail reservasi dari backend
+    const fetchReservationDetails = useCallback(async (id) => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('Anda harus login untuk melihat detail reservasi.');
+                navigate('/login');
+                return;
+            }
+
+            // Anda perlu endpoint backend untuk mendapatkan detail reservasi berdasarkan ID
+            // Contoh: /api/reservations/:id (ini rute admin, Anda mungkin butuh rute user-spesifik)
+            // Untuk demo ini, asumsikan ada endpoint untuk user melihat reservasi mereka
+            // atau modifikasi rute admin agar bisa diakses user tertentu (misal: authorizeRole(['admin', 'user']))
+            const response = await axios.get(`${getApiUrl()}/api/user/reservations/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const resData = response.data.data;
+            if (resData) {
+                setReservationDetails({
+                    motor: `${resData.motor_brand} ${resData.motor_type}`, // Sesuaikan dengan respons backend
+                    nama: resData.user_nama_lengkap, // Sesuaikan dengan respons backend
+                    tanggal: new Date(resData.tanggal_mulai).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }),
+                    lama: `${resData.lama_sewa} hari`,
+                    total: `Rp ${parseFloat(resData.total_harga).toLocaleString('id-ID')}`
+                });
+            }
+        } catch (err) {
+            console.error('Error fetching reservation details:', err);
+            setError(`Gagal memuat detail reservasi: ${err.response?.data?.message || err.message}`);
+            // Opsional: Redirect jika reservasi tidak ditemukan atau error
+            // navigate('/');
+        }
+    }, [navigate]);
+
 
     // useEffect untuk memuat data reservasi jika ada dari state navigasi
     useEffect(() => {
-        // ✅ Mengaktifkan logika untuk memuat data reservasi dari location.state
-        const { reservasiData } = location.state || {}; // Ambil data dari state navigasi
-        
-        if (reservasiData) {
-            setReservationDetails({ // <-- Fungsi setReservationDetails sekarang dipanggil
-                motor: `${reservasiData.merkMotor} ${reservasiData.tipeMotor}`,
-                nama: reservasiData.namaLengkap,
-                tanggal: new Date(reservasiData.tanggalSewa).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }),
-                lama: `${reservasiData.lamaSewa} hari`,
-                total: `Rp ${hitungTotalHarga(reservasiData.tipeMotor, reservasiData.lamaSewa).toLocaleString('id-ID')}`
-            });
+        const state = location.state || {};
+        const { reservationId, totalHarga } = state; // Ambil reservationId dan totalHarga
+
+        if (reservationId) {
+            setReservationId(reservationId); // Simpan ID reservasi di state
+            // Fetch detail reservasi dari backend jika ID tersedia
+            // Jika Anda sudah memiliki semua data di `totalHarga` dan `reservasiData`, Anda bisa langsung set state
+            // Daripada fetch lagi, kita gunakan data yang sudah ada (jika lengkap)
+            setReservationDetails(prev => ({
+                ...prev,
+                total: `Rp ${parseFloat(totalHarga).toLocaleString('id-ID')}`
+            }));
+            fetchReservationDetails(reservationId); // Panggil untuk mendapatkan detail motor, nama user, dll.
+        } else {
+            // Jika tidak ada reservationId, mungkin pengguna langsung mengakses halaman ini
+            // Anda bisa redirect atau menampilkan pesan error
+            setError('Detail reservasi tidak ditemukan. Silakan buat reservasi terlebih dahulu.');
+            // navigate('/'); // Redirect ke halaman utama
         }
-    }, [location.state]); // ✅ Tambahkan location.state sebagai dependensi useEffect
+    }, [location.state, fetchReservationDetails, navigate]);
 
     // Fungsi helper untuk menyalin teks ke clipboard
     const copyToClipboard = (text) => {
         navigator.clipboard.writeText(text).then(() => {
-            alert('Nomor rekening berhasil disalin!'); // Ganti dengan notifikasi/modal React yang lebih canggih
+            alert('Nomor rekening berhasil disalin!');
         }).catch(err => {
             console.error('Failed to copy text: ', err);
-            alert('Gagal menyalin nomor rekening.'); 
+            alert('Gagal menyalin nomor rekening.');
         });
     };
 
@@ -90,10 +106,9 @@ const Pembayaran = () => {
     const handleFileUploadChange = (e) => {
         const file = e.target.files[0];
         if (file) {
-            // Validasi ukuran dan tipe file (sesuai original JS)
             if (file.size > 5 * 1024 * 1024) {
                 alert('File terlalu besar. Maksimal 5MB.');
-                e.target.value = ''; 
+                e.target.value = '';
                 setBuktiPembayaran(null);
                 setFileNameDisplay('');
                 setUploadSuccessVisible(false);
@@ -102,7 +117,7 @@ const Pembayaran = () => {
             const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
             if (!allowedTypes.includes(file.type)) {
                 alert('Format file tidak didukung. Gunakan JPG, PNG, atau PDF.');
-                e.target.value = ''; 
+                e.target.value = '';
                 setBuktiPembayaran(null);
                 setFileNameDisplay('');
                 setUploadSuccessVisible(false);
@@ -112,6 +127,7 @@ const Pembayaran = () => {
             setBuktiPembayaran(file);
             setFileNameDisplay(file.name);
             setUploadSuccessVisible(true);
+            setError(null); // Clear previous error
         } else {
             setBuktiPembayaran(null);
             setFileNameDisplay('');
@@ -136,7 +152,7 @@ const Pembayaran = () => {
         e.preventDefault();
         e.currentTarget.style.borderColor = 'var(--gray-300)';
         e.currentTarget.style.backgroundColor = 'transparent';
-        
+
         const files = e.dataTransfer.files;
         if (files.length > 0) {
             const dataTransfer = new DataTransfer();
@@ -147,38 +163,80 @@ const Pembayaran = () => {
     };
 
     // Handler submit form pembayaran
-    const handlePembayaranSubmit = (e) => {
+    const handlePembayaranSubmit = async (e) => {
         e.preventDefault();
-        
+        setError(null);
+        setUploadLoading(true);
+
         if (!buktiPembayaran) {
-            alert('Mohon upload bukti pembayaran!');
+            setError('Mohon upload bukti pembayaran!');
+            setUploadLoading(false);
             return;
         }
-        
-        // --- LOGIKA PENGIRIMAN DATA KE BACKEND AKAN DITEMPATKAN DI SINI ---
+
+        if (!reservationId) {
+            setError('ID Reservasi tidak ditemukan. Harap refresh halaman atau hubungi dukungan.');
+            setUploadLoading(false);
+            return;
+        }
+
         const formData = new FormData();
-        formData.append('buktiPembayaran', buktiPembayaran);
+        formData.append('reservasi_id', reservationId); // Kirim ID reservasi
+        formData.append('buktiPembayaran', buktiPembayaran); // Ini nama field yang diharapkan multer di backend
         formData.append('catatanTambahan', catatanTambahan);
-        // formData.append('reservasi_id', idReservasiYangDidapat);
-        
-        console.log('Mengirim bukti pembayaran (simulasi):', {
-            file: buktiPembayaran.name,
-            catatan: catatanTambahan
-        });
-        alert('Bukti pembayaran berhasil di-upload!');
-        
-        // --- SIMULASI KONFIRMASI DAN REDIRECT KE WHATSAPP ---
-        setTimeout(() => {
-            if (window.confirm('Konfirmasi bahwa Anda sudah melakukan pembayaran sesuai dengan jumlah yang tertera?')) {
-                const phoneNumber = '6281234567890';
-                const message = encodeURIComponent('Halo, saya sudah melakukan pembayaran untuk rental motor. Mohon dikonfirmasi. Terima kasih!');
-                const waUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-                
-                alert('Terima kasih! Anda akan diarahkan ke WhatsApp untuk konfirmasi lebih lanjut.');
-                window.open(waUrl, '_blank');
+
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('Anda harus login untuk mengunggah bukti pembayaran.');
+                navigate('/login');
+                setUploadLoading(false);
+                return;
             }
-        }, 1000);
+
+            const response = await axios.post(`${getApiUrl()}/api/payments/upload-proof`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data', // Penting untuk upload file
+                    'Authorization': `Bearer ${token}`
+                },
+                // OnUploadProgress bisa ditambahkan jika ingin menampilkan progress bar
+            });
+
+            console.log('Respons upload:', response.data);
+            alert(response.data.message || 'Bukti pembayaran berhasil diunggah!');
+
+            // Redirect ke WhatsApp
+            setTimeout(() => {
+                const phoneNumber = '6281234567890'; // Ganti dengan nomor WhatsApp admin Anda
+                const message = encodeURIComponent(`Halo, saya sudah melakukan pembayaran untuk reservasi ID ${reservationId}. Mohon dikonfirmasi. Terima kasih!`);
+                const waUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+
+                // Konfirmasi dengan user sebelum redirect
+                if (window.confirm('Terima kasih! Bukti pembayaran Anda telah terkirim. Anda akan diarahkan ke WhatsApp untuk konfirmasi lebih lanjut dengan admin.')) {
+                    window.open(waUrl, '_blank');
+                    // Opsional: setelah WhatsApp, redirect kembali ke halaman utama atau riwayat reservasi
+                    navigate('/reservations-history'); // Atau halaman lain
+                } else {
+                    // Jika user tidak ingin diarahkan ke WhatsApp
+                    navigate('/reservations-history'); // Atau halaman lain
+                }
+
+            }, 500);
+
+        } catch (err) {
+            console.error('Error uploading payment proof:', err);
+            let errorMessage = 'Gagal mengunggah bukti pembayaran: ';
+            if (err.response?.data?.message) {
+                errorMessage += err.response.data.message;
+            } else if (err.message) {
+                errorMessage += err.message;
+            }
+            setError(errorMessage);
+        } finally {
+            setUploadLoading(false);
+        }
     };
+
 
     return (
         <>
@@ -187,8 +245,17 @@ const Pembayaran = () => {
             {/* Main Content */}
             <main className="main-content">
                 <div className="container">
+
+                    {error && (
+                        <div className="error-alert" style={{ marginBottom: '20px' }}>
+                            <span className="error-icon">⚠️</span>
+                            {error}
+                            <button className="error-close" onClick={() => setError(null)}>✖️</button>
+                        </div>
+                    )}
+
                     <div className="pembayaran-wrapper">
-                        
+
                         {/* Progress Indicator */}
                         <div className="progress-indicator">
                             <div className="progress-step completed">
@@ -239,7 +306,7 @@ const Pembayaran = () => {
                                             <div className="summary-label">Lama Sewa</div>
                                             <div className="summary-value" id="lamaDetail">{reservationDetails.lama}</div>
                                         </div>
-                                        
+
                                         <div className="total-section">
                                             <div className="total-label">Total Pembayaran</div>
                                             <div className="total-amount" id="totalHarga">{reservationDetails.total}</div>
@@ -271,7 +338,7 @@ const Pembayaran = () => {
                                                 </div>
                                             </div>
                                         </div>
-                                        
+
                                         <div className="payment-steps">
                                             <h4 className="steps-title">📝 Langkah Pembayaran</h4>
                                             <div className="steps-list">
@@ -308,18 +375,20 @@ const Pembayaran = () => {
                                         <form id="pembayaranForm" className="payment-form" onSubmit={handlePembayaranSubmit}>
                                             <div className="form-group">
                                                 <label htmlFor="buktiPembayaran" className="form-label">Bukti Transfer</label>
-                                                <div 
-                                                    className="file-upload-area" 
+                                                <div
+                                                    className="file-upload-area"
                                                     onDragOver={handleDragOver}
                                                     onDragLeave={handleDragLeave}
                                                     onDrop={handleDrop}
                                                 >
-                                                    <input 
-                                                        type="file" 
-                                                        id="buktiPembayaran" 
-                                                        accept="image/*,.pdf" 
+                                                    <input
+                                                        type="file"
+                                                        id="buktiPembayaran"
+                                                        name="buktiPembayaran" // Nama harus sesuai dengan multer single('buktiPembayaran')
+                                                        accept="image/*,.pdf"
                                                         onChange={handleFileUploadChange}
-                                                        required 
+                                                        required
+                                                        disabled={uploadLoading}
                                                     />
                                                     {!uploadSuccessVisible ? (
                                                         <div className="upload-placeholder">
@@ -337,26 +406,28 @@ const Pembayaran = () => {
                                                     )}
                                                 </div>
                                             </div>
-                                            
+
                                             <div className="form-group">
                                                 <label htmlFor="catatanTambahan" className="form-label">Catatan Tambahan (Opsional)</label>
-                                                <textarea 
-                                                    id="catatanTambahan" 
-                                                    className="form-textarea" 
-                                                    rows="3" 
+                                                <textarea
+                                                    id="catatanTambahan"
+                                                    name="catatanTambahan" // Nama harus sesuai dengan req.body di backend
+                                                    className="form-textarea"
+                                                    rows="3"
                                                     placeholder="Tambahkan catatan jika diperlukan..."
                                                     value={catatanTambahan}
                                                     onChange={(e) => setCatatanTambahan(e.target.value)}
+                                                    disabled={uploadLoading}
                                                 ></textarea>
                                             </div>
-                                            
+
                                             <div className="form-actions">
-                                                <Link to="/" className="btn btn-secondary">
+                                                <Link to="/" className="btn btn-secondary" disabled={uploadLoading}>
                                                     Kembali
                                                 </Link>
-                                                <button type="submit" className="btn btn-primary">
-                                                    <span className="btn-icon">💳</span>
-                                                    Konfirmasi Pembayaran
+                                                <button type="submit" className="btn btn-primary" disabled={uploadLoading}>
+                                                    {uploadLoading ? 'Mengunggah...' : 'Konfirmasi Pembayaran'}
+                                                    {uploadLoading && <span className="spinner"></span>}
                                                 </button>
                                             </div>
                                         </form>

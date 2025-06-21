@@ -1,3 +1,4 @@
+// backend/models/Motor.js
 const db = require('../config/db');
 
 class Motor {
@@ -33,7 +34,7 @@ class Motor {
             if (filters.limit) {
                 query += ' LIMIT ?';
                 params.push(parseInt(filters.limit));
-                
+
                 if (filters.offset) {
                     query += ' OFFSET ?';
                     params.push(parseInt(filters.offset));
@@ -60,14 +61,13 @@ class Motor {
     // Create new motor
     static async create(motorData) {
         try {
-            // PERBAIKAN: Sesuaikan field names dengan yang digunakan di controller
             const { brand, type, harga_sewa, specs, status, description, gambar_motor } = motorData;
-            
+
             const query = `
                 INSERT INTO motors (brand, type, harga_sewa, specs, status, description, gambar_motor)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             `;
-            
+
             const [result] = await db.query(query, [
                 brand, type, harga_sewa, specs, status || 'available', description, gambar_motor
             ]);
@@ -81,11 +81,10 @@ class Motor {
     // Update motor
     static async update(id, motorData) {
         try {
-            // PERBAIKAN: Sesuaikan field names dengan yang digunakan di controller
             const { brand, type, harga_sewa, specs, status, description, gambar_motor } = motorData;
-            
+
             let query = `
-                UPDATE motors 
+                UPDATE motors
                 SET brand = ?, type = ?, harga_sewa = ?, specs = ?, status = ?, description = ?
             `;
             const params = [brand, type, harga_sewa, specs, status, description];
@@ -100,8 +99,7 @@ class Motor {
             params.push(id);
 
             const [result] = await db.query(query, params);
-            
-            // PERBAIKAN: Return null jika tidak ada rows yang terpengaruh
+
             if (result.affectedRows === 0) {
                 return null;
             }
@@ -116,7 +114,7 @@ class Motor {
     static async delete(id) {
         try {
             const [result] = await db.query('DELETE FROM motors WHERE id = ?', [id]);
-            
+
             if (result.affectedRows === 0) {
                 throw new Error('Motor not found');
             }
@@ -136,10 +134,9 @@ class Motor {
 
             const placeholders = ids.map(() => '?').join(',');
             const query = `DELETE FROM motors WHERE id IN (${placeholders})`;
-            
+
             const [result] = await db.query(query, ids);
-            
-            // PERBAIKAN: Return hanya jumlah yang terhapus, bukan objek
+
             return result.affectedRows;
         } catch (error) {
             throw new Error(`Error bulk deleting motors: ${error.message}`);
@@ -150,14 +147,14 @@ class Motor {
     static async getStats() {
         try {
             const [stats] = await db.query(`
-                SELECT 
+                SELECT
                     COUNT(*) as total,
                     SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) as available,
                     SUM(CASE WHEN status = 'rented' THEN 1 ELSE 0 END) as rented,
                     SUM(CASE WHEN status = 'maintenance' THEN 1 ELSE 0 END) as maintenance
                 FROM motors
             `);
-            
+
             return stats[0];
         } catch (error) {
             throw new Error(`Error fetching motor stats: ${error.message}`);

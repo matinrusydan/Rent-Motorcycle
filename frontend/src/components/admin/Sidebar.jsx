@@ -1,12 +1,18 @@
 // frontend/src/components/admin/Sidebar.jsx
 
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom'; // ✅ Impor useNavigate
+import { Link, useNavigate, useLocation } from 'react-router-dom'; // ✅ Tambah useLocation
 import '../../assets/css/admin/sidebar.css'; // Impor CSS khusus sidebar
 import '../../assets/css/global.css'; // Global CSS mungkin diperlukan juga di sini
 
 const Sidebar = () => {
     const navigate = useNavigate(); // Inisialisasi useNavigate
+    const location = useLocation(); // Untuk mendapatkan current path
+
+    // Fungsi untuk mengecek apakah path saat ini aktif
+    const isActive = (path) => {
+        return location.pathname === path;
+    };
 
     // Fungsi untuk menangani proses logout
     const handleLogout = () => {
@@ -32,7 +38,7 @@ const Sidebar = () => {
             <hr className="sidebar-divider my-0" />
 
             {/* Nav Item - Dashboard */}
-            <li className="nav-item active">
+            <li className={`nav-item ${isActive('/admin/dashboard') ? 'active' : ''}`}>
                 <Link className="nav-link" to="/admin/dashboard">
                     <i className="fas fa-fw fa-tachometer-alt"></i>
                     <span>Dashboard</span>
@@ -47,16 +53,8 @@ const Sidebar = () => {
                 Manajemen User
             </div>
 
-            {/* Nav Item - Verifikasi & Aktivasi */}
-            <li className="nav-item">
-                <Link className="nav-link" to="/admin/verifikasi">
-                    <i className="fas fa-fw fa-user-check"></i>
-                    <span>Verifikasi & Aktivasi</span>
-                </Link>
-            </li>
-
             {/* Nav Item - Pending Registrasi */}
-            <li className="nav-item">
+            <li className={`nav-item ${isActive('/admin/pending-registrasi') ? 'active' : ''}`}>
                 <Link className="nav-link" to="/admin/pending-registrasi">
                     <i className="fas fa-fw fa-user-clock"></i>
                     <span>Pending Registrasi</span>
@@ -64,7 +62,7 @@ const Sidebar = () => {
             </li>
 
             {/* Nav Item - User */}
-            <li className="nav-item">
+            <li className={`nav-item ${isActive('/admin/user') ? 'active' : ''}`}>
                 <Link className="nav-link" to="/admin/user">
                     <i className="fas fa-fw fa-users"></i>
                     <span>User</span>
@@ -80,7 +78,7 @@ const Sidebar = () => {
             </div>
 
             {/* Nav Item - Motor */}
-            <li className="nav-item">
+            <li className={`nav-item ${isActive('/admin/motor') ? 'active' : ''}`}>
                 <Link className="nav-link" to="/admin/motor">
                     <i className="fas fa-fw fa-motorcycle"></i>
                     <span>Motor</span>
@@ -88,7 +86,7 @@ const Sidebar = () => {
             </li>
 
             {/* Nav Item - Reservasi */}
-            <li className="nav-item">
+            <li className={`nav-item ${isActive('/admin/reservasi') ? 'active' : ''}`}>
                 <Link className="nav-link" to="/admin/reservasi">
                     <i className="fas fa-fw fa-calendar-alt"></i>
                     <span>Reservasi</span>
@@ -96,7 +94,7 @@ const Sidebar = () => {
             </li>
 
             {/* Nav Item - Pembayaran */}
-            <li className="nav-item">
+            <li className={`nav-item ${isActive('/admin/pembayaran') ? 'active' : ''}`}>
                 <Link className="nav-link" to="/admin/pembayaran">
                     <i className="fas fa-fw fa-credit-card"></i>
                     <span>Pembayaran</span>
@@ -104,7 +102,7 @@ const Sidebar = () => {
             </li>
 
             {/* Nav Item - Testimoni */}
-            <li className="nav-item">
+            <li className={`nav-item ${isActive('/admin/testimoni') ? 'active' : ''}`}>
                 <Link className="nav-link" to="/admin/testimoni">
                     <i className="fas fa-fw fa-star"></i>
                     <span>Testimoni</span>
@@ -115,7 +113,7 @@ const Sidebar = () => {
             <hr className="sidebar-divider" />
 
             {/* Nav Item - Settings */}
-            <li className="nav-item">
+            <li className={`nav-item ${isActive('/admin/settings') ? 'active' : ''}`}>
                 <Link className="nav-link" to="/admin/settings">
                     <i className="fas fa-fw fa-cogs"></i>
                     <span>Settings</span>

@@ -20,6 +20,7 @@
   color: rgba(255, 255, 255, 0.8);
   display: flex;
   align-items: center;
+  transition: all 0.3s ease;
 }
 
 .sidebar .nav-item .nav-link i {
@@ -34,15 +35,30 @@
 
 .sidebar .nav-item .nav-link:hover {
   color: var(--white, #fff);
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .sidebar .nav-item .nav-link:focus, .sidebar .nav-item .nav-link:hover {
   text-decoration: none;
 }
 
+/* Active State Styling - Updated */
 .sidebar .nav-item.active .nav-link {
-  color: var(--white, #fff);
-  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--primary-color, #4e73df) !important;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 0.35rem;
+  margin: 0 0.5rem;
+  width: calc(224px - 1rem);
+  font-weight: 600;
+  box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+}
+
+.sidebar .nav-item.active .nav-link i {
+  color: var(--primary-color, #4e73df);
+}
+
+.sidebar .nav-item.active .nav-link span {
+  color: var(--primary-color, #4e73df);
 }
 
 .sidebar-brand {
@@ -129,6 +145,12 @@
     display: block;
     font-size: 1.2rem;
     margin-right: 0;
+  }
+  
+  /* Active state untuk sidebar yang toggled */
+  .sidebar.toggled .nav-item.active .nav-link {
+    width: calc(90px - 1rem);
+    margin: 0 0.5rem;
   }
   
   .sidebar.toggled .sidebar-brand .sidebar-brand-text {

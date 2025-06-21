@@ -1,39 +1,41 @@
 // frontend/src/components/Header.jsx
 
-import React, { useState, useEffect } from 'react'; // Import useEffect
-import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import '../assets/css/navbar.css';
 import '../assets/css/global.css';
 
 const Header = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    // 1. Add a state to manage login status
     const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const navigate = useNavigate(); // Initialize useNavigate hook
+    const navigate = useNavigate();
 
     const toggleMobileMenu = () => {
         setIsMobileMenuOpen(!isMobileMenuOpen);
     };
 
-    // 2. Check login status on component mount
+    // Periksa status login saat komponen dimuat atau saat terjadi perubahan navigasi
     useEffect(() => {
-        // This is a simplified example.
-        // In a real app, you'd check for a token in localStorage,
-        // or a user object in context/redux.
-        const token = localStorage.getItem('authToken'); // Example: check for a token
+        // *** GUNAKAN KUNCI 'token' SESUAI DENGAN Login.jsx ***
+        const token = localStorage.getItem('token'); // Mengambil token yang disimpan oleh Login.jsx
+        
+        // Log untuk debugging: lihat nilai token
+        console.log('Header - Token dari localStorage:', token); 
+
         if (token) {
             setIsLoggedIn(true);
         } else {
             setIsLoggedIn(false);
         }
-    }, []); // Empty dependency array means this runs once on mount
+    }, [navigate]); // Tambahkan navigate sebagai dependensi agar effect berjalan saat navigasi berubah
 
     const handleLogout = () => {
-        // 3. Implement logout logic
-        localStorage.removeItem('authToken'); // Example: remove the token
-        setIsLoggedIn(false); // Update state
-        navigate('/login'); // Redirect to login page after logout (optional)
-        toggleMobileMenu(); // Close mobile menu if open
+        // Hapus token dan data user saat logout
+        localStorage.removeItem('token'); // Hapus token
+        localStorage.removeItem('user');  // Hapus data user juga
+        setIsLoggedIn(false); // Perbarui state menjadi tidak login
+        navigate('/login'); // Arahkan ke halaman login
+        toggleMobileMenu(); // Tutup menu mobile (jika terbuka)
     };
 
     return (
@@ -51,7 +53,7 @@ const Header = () => {
                         <Link to="/tentang" className="nav-link">Tentang</Link>
                     </div>
 
-                    {/* 4. Conditional rendering for auth buttons */}
+                    {/* Conditional rendering untuk tombol autentikasi */}
                     <div className="auth-buttons">
                         {isLoggedIn ? (
                             <button onClick={handleLogout} className="btn btn-login">Logout</button>
@@ -77,7 +79,7 @@ const Header = () => {
                         <a href="#testimoni" className="mobile-nav-link" onClick={toggleMobileMenu}>Testimoni</a>
                         <Link to="/tentang" className="mobile-nav-link" onClick={toggleMobileMenu}>Tentang</Link>
                     </div>
-                    {/* 5. Conditional rendering for mobile auth buttons */}
+                    {/* Conditional rendering untuk tombol autentikasi seluler */}
                     <div className="mobile-auth-buttons">
                         {isLoggedIn ? (
                             <button onClick={handleLogout} className="btn btn-login">Logout</button>

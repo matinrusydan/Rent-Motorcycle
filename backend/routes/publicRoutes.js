@@ -4,6 +4,8 @@ const router = express.Router();
 const motorController = require('../controllers/motorController');
 const testimonialController = require('../controllers/testimonialController');
 const reservationController = require('../controllers/reservationController'); // Impor controller reservasi
+const { verifyToken, authorizeRole } = require('../middlewares/authMiddleware'); // Pastikan ini diimpor jika belum
+
 
 // --- RUTE PUBLIK (Tidak perlu autentikasi JWT atau role) ---
 
@@ -21,5 +23,7 @@ router.post('/testimonials', testimonialController.createTestimonial);
 // Membuat reservasi baru (membutuhkan user_id, jadi pengguna harus login)
 // Rute ini bisa saja dilindungi oleh verifyToken jika Anda hanya ingin user login yang bisa buat
 router.post('/reservations', reservationController.createReservation);
+
+router.get('/reservations/:id', verifyToken, authorizeRole(['user', 'admin']), reservationController.getReservationById);
 
 module.exports = router;

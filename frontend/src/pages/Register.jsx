@@ -1,10 +1,6 @@
-// frontend/src/pages/Register.jsx
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import '../assets/css/register.css';
-import '../assets/css/global.css';
 
 const Register = () => {
     // State untuk form data
@@ -74,17 +70,6 @@ const Register = () => {
     useEffect(() => {
         const hasNoErrors = Object.keys(fieldErrors).length === 0;
         const allFieldsFilled = isAllFieldsFilled();
-        
-        console.log('Form Validation Status:', { 
-            hasNoErrors, 
-            allFieldsFilled, 
-            fieldErrors,
-            formData: Object.keys(formData).reduce((acc, key) => {
-                acc[key] = formData[key] ? '✓' : '✗';
-                return acc;
-            }, {})
-        });
-        
         setIsFormValid(hasNoErrors && allFieldsFilled);
     }, [formData, fieldErrors, isAllFieldsFilled]);
 
@@ -233,7 +218,7 @@ const Register = () => {
         
         setFormData(prev => ({ ...prev, [name]: newValue }));
         
-        // Validasi langsung tanpa setTimeout
+        // Validasi langsung
         validateField(name, newValue);
         
         // Handle dependent dropdowns
@@ -291,11 +276,6 @@ const Register = () => {
         setMessageType('');
         setIsLoading(true);
 
-        console.log('Form submission started');
-        console.log('Current form data:', formData);
-        console.log('Current field errors:', fieldErrors);
-        console.log('Is form valid:', isFormValid);
-
         // Validasi ulang semua field
         const tempErrors = {};
         Object.keys(formData).forEach(key => {
@@ -341,16 +321,12 @@ const Register = () => {
                 }
             });
 
-            console.log('Submitting to:', `${getApiUrl()}/api/auth/register`);
-            
             const response = await axios.post(`${getApiUrl()}/api/auth/register`, submitData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
                 timeout: 30000,
             });
-
-            console.log('Registration response:', response.data);
 
             setMessage(response.data.message || 'Pendaftaran berhasil! Akun Anda akan diverifikasi oleh admin dalam 1-2 hari kerja.');
             setMessageType('success');
@@ -372,10 +348,6 @@ const Register = () => {
                 provinsi: '',
                 fotoKtp: null
             });
-            
-            // Reset file input
-            const fileInput = document.getElementById('foto_ktp');
-            if (fileInput) fileInput.value = '';
             
             setFieldErrors({});
 
@@ -411,310 +383,590 @@ const Register = () => {
         }
     };
 
-    return (
-        <div className="auth-page">
-            <div className="auth-container">
-                {/* Left Side - Hero Section */}
-                <section className="auth-left">
-                    <div className="hero-content">
-                        <div className="hero-icon">🏍️</div>
-                        <h1 className="hero-title">RentalMotor</h1>
-                        <p className="hero-subtitle">
-                            Bergabunglah dengan komunitas rental motor terpercaya dan nikmati kemudahan sewa motor berkualitas
-                        </p>
-                        
-                        <div className="feature-list">
-                            <div className="feature-item">
-                                <div className="feature-icon">📝</div>
-                                <div className="feature-text">Daftar Mudah</div>
-                            </div>
-                            <div className="feature-item">
-                                <div className="feature-icon">🛡️</div>
-                                <div className="feature-text">Data Aman</div>
-                            </div>
-                            <div className="feature-item">
-                                <div className="feature-icon">⚡</div>
-                                <div className="feature-text">Verifikasi Cepat</div>
-                            </div>
-                        </div>
+// Revisi bagian return - ganti dari baris 449 sampai sekitar baris 500
+
+return (
+    <div style={{
+        margin: 0,
+        padding: 0,
+        fontFamily: "'Trebuchet MS', sans-serif",
+        boxSizing: 'border-box',
+        backgroundColor: '#f5f5f5', // Background abu-abu seperti di gambar
+        minHeight: '100vh',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center'
+    }}>
+        {/* Container Pembungkus Utama - Seperti di gambar */}
+        <div style={{
+            width: '90%',
+            maxWidth: '1200px',
+            backgroundColor: '#ffffff',
+            borderRadius: '20px',
+            boxShadow: '0 0 30px rgba(0, 0, 0, 0.1)',
+            overflow: 'hidden',
+            display: 'flex',
+            minHeight: '600px'
+        }}>
+            {/* Left Side - Images */}
+            <div style={{
+                width: '50%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: '#1A35B5',
+                padding: '40px',
+                position: 'relative'
+            }}>
+                {/* Logo/Gambar Motor */}
+                <div style={{
+                    width: '100%',
+                    height: '300px',
+                    backgroundImage: 'url(public/images/imageLogin.jpg)',
+                    backgroundSize: 'contain',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center',
+                    marginBottom: '40px'
+                }}>
+                    {/* Fallback jika gambar tidak ada */}
+                    <div style={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '72px'
+                    }}>🏍️</div>
+                </div>
+
+                {/* Title */}
+                <h1 style={{
+                    color: '#ffffff',
+                    fontSize: '36px',
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    margin: '0 0 20px 0'
+                }}>RentalMotor</h1>
+
+                <p style={{
+                    color: '#ffffff',
+                    fontSize: '16px',
+                    textAlign: 'center',
+                    lineHeight: '1.6',
+                    opacity: 0.9
+                }}>
+                    Solusi terbaik untuk kebutuhan rental motor Anda 
+                    dengan layanan terpercaya dan kualitas terjamin
+                </p>
+
+                {/* Feature Icons */}
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-around',
+                    width: '100%',
+                    marginTop: '40px'
+                }}>
+                    <div style={{
+                        textAlign: 'center',
+                        color: '#ffffff'
+                    }}>
+                        <div style={{
+                            width: '60px',
+                            height: '60px',
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '24px',
+                            margin: '0 auto 10px'
+                        }}>⚡</div>
+                        <p style={{ fontSize: '12px', margin: 0 }}>Proses Cepat</p>
                     </div>
-                </section>
+                    <div style={{
+                        textAlign: 'center',
+                        color: '#ffffff'
+                    }}>
+                        <div style={{
+                            width: '60px',
+                            height: '60px',
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '24px',
+                            margin: '0 auto 10px'
+                        }}>🛡️</div>
+                        <p style={{ fontSize: '12px', margin: 0 }}>Aman Terpercaya</p>
+                    </div>
+                    <div style={{
+                        textAlign: 'center',
+                        color: '#ffffff'
+                    }}>
+                        <div style={{
+                            width: '60px',
+                            height: '60px',
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '24px',
+                            margin: '0 auto 10px'
+                        }}>💰</div>
+                        <p style={{ fontSize: '12px', margin: 0 }}>Harga Terjangkau</p>
+                    </div>
+                </div>
+            </div>
 
-                {/* Right Side - Form Section */}
-                <section className="auth-right">
-                    <div className="form-container">
-                        <div className="form-header">
-                            <h1 className="form-title">BUAT AKUN BARU</h1>
-                            <h2 className="form-subtitle">DAFTAR AKUN</h2>
+            {/* Right Side - Form */}
+            <div style={{
+                width: '50%',
+                padding: '40px',
+                backgroundColor: '#ffffff',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center'
+            }}>
+                <div style={{
+                    width: '100%',
+                    maxWidth: '400px',
+                    margin: '0 auto'
+                }}>
+                    {/* Header */}
+                    <div style={{ marginBottom: '30px' }}>
+                        <h1 style={{
+                            color: '#1A35B5',
+                            fontFamily: "'Trebuchet MS', sans-serif",
+                            fontSize: '18px',
+                            margin: '0 0 5px 0'
+                        }}>BUAT AKUN BARU</h1>
+                        <h2 style={{
+                            fontSize: '28px',
+                            fontWeight: 'bold',
+                            fontFamily: "'Trebuchet MS', sans-serif",
+                            color: '#000',
+                            margin: '0 0 16px 0'
+                        }}>DAFTAR AKUN</h2>
+                    </div>
+
+                    {/* Error Message */}
+                    {message && (
+                        <div style={{
+                            color: messageType === 'error' ? '#ff0000' : '#00A200',
+                            textAlign: 'center',
+                            margin: '0 0 20px 0',
+                            fontWeight: 'bold',
+                            padding: '10px',
+                            borderRadius: '6px',
+                            backgroundColor: messageType === 'error' ? '#ffe6e6' : '#e6ffe6'
+                        }}>
+                            {message}
                         </div>
+                    )}
 
-                        {/* Debug Info (remove in production) */}
-                        {import.meta.env.DEV && (
-                            <div style={{ padding: '10px', backgroundColor: '#f0f0f0', marginBottom: '10px', fontSize: '12px' }}>
-                                <strong>Debug Info:</strong><br/>
-                                API URL: {getApiUrl()}<br/>
-                                Form Valid: {isFormValid ? '✓' : '✗'}<br/>
-                                Errors: {Object.keys(fieldErrors).length}<br/>
-                                All Fields Filled: {isAllFieldsFilled() ? '✓' : '✗'}
-                            </div>
+                    {/* Form */}
+                    <form onSubmit={handleSubmit} style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '14px'
+                    }}>
+                        {/* Email */}
+                        <input
+                            type="email"
+                            name="email"
+                            placeholder="Email"
+                            value={formData.email}
+                            onChange={handleInputChange}
+                            disabled={isLoading}
+                            style={{
+                                height: '45px',
+                                padding: '8px 12px',
+                                border: fieldErrors.email ? '1px solid #ff0000' : '1px solid rgba(0, 0, 0, 0.1)',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                width: '100%',
+                                boxSizing: 'border-box'
+                            }}
+                        />
+                        {fieldErrors.email && (
+                            <span style={{ color: '#ff0000', fontSize: '12px' }}>
+                                {fieldErrors.email}
+                            </span>
                         )}
 
-                        {/* Alert Messages */}
-                        {message && (
-                            <div className={`alert ${messageType === 'success' ? 'alert-success' : 'alert-danger'}`}>
-                                {message}
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSubmit} className="register-form">
-                            {/* Email */}
-                            <div className="input-group">
-                                <input 
-                                    type="email" 
-                                    name="email" 
-                                    placeholder="Email" 
-                                    className={`form-input full-width ${fieldErrors.email ? 'error' : ''}`}
-                                    value={formData.email}
-                                    onChange={handleInputChange}
-                                    required
-                                />
-                                {fieldErrors.email && <span className="error-text">{fieldErrors.email}</span>}
-                            </div>
-                            
-                            {/* Password Fields */}
-                            <div className="form-row">
-                                <div className="input-group">
-                                    <input 
-                                        type="password" 
-                                        name="password" 
-                                        placeholder="Password" 
-                                        className={`form-input ${fieldErrors.password ? 'error' : ''}`}
-                                        value={formData.password}
-                                        onChange={handleInputChange}
-                                        required
-                                    />
-                                    {fieldErrors.password && <span className="error-text">{fieldErrors.password}</span>}
-                                </div>
-                                <div className="input-group">
-                                    <input 
-                                        type="password" 
-                                        name="confirmPassword" 
-                                        placeholder="Konfirmasi Password" 
-                                        className={`form-input ${fieldErrors.confirmPassword ? 'error' : ''}`}
-                                        value={formData.confirmPassword}
-                                        onChange={handleInputChange}
-                                        required
-                                    />
-                                    {fieldErrors.confirmPassword && <span className="error-text">{fieldErrors.confirmPassword}</span>}
-                                </div>
-                            </div>
-
-                            {/* Personal Info */}
-                            <div className="input-group">
-                                <input 
-                                    type="text" 
-                                    name="namaLengkap" 
-                                    placeholder="Nama Lengkap (sesuai KTP)" 
-                                    className={`form-input full-width ${fieldErrors.namaLengkap ? 'error' : ''}`}
-                                    value={formData.namaLengkap}
-                                    onChange={handleInputChange}
-                                    required
-                                />
-                                {fieldErrors.namaLengkap && <span className="error-text">{fieldErrors.namaLengkap}</span>}
-                            </div>
-                            
-                            <div className="form-row">
-                                <div className="input-group">
-                                    <input 
-                                        type="tel" 
-                                        name="noHp" 
-                                        placeholder="No. HP (08xxxxxxxxxx)" 
-                                        className={`form-input ${fieldErrors.noHp ? 'error' : ''}`}
-                                        value={formData.noHp}
-                                        onChange={handleInputChange}
-                                        required
-                                    />
-                                    {fieldErrors.noHp && <span className="error-text">{fieldErrors.noHp}</span>}
-                                </div>
-                                <div className="input-group">
-                                    <select 
-                                        name="jenisKelamin" 
-                                        className={`form-input ${fieldErrors.jenisKelamin ? 'error' : ''}`}
-                                        value={formData.jenisKelamin}
-                                        onChange={handleInputChange}
-                                        required
-                                    >
-                                        <option value="">Jenis Kelamin</option>
-                                        <option value="laki-laki">Laki-laki</option>
-                                        <option value="perempuan">Perempuan</option>
-                                    </select>
-                                    {fieldErrors.jenisKelamin && <span className="error-text">{fieldErrors.jenisKelamin}</span>}
-                                </div>
-                            </div>
-                            
-                            {/* Address Section */}
-                            <div className="address-section">
-                                <h3 className="section-title">Alamat Lengkap</h3>
-                                
-                                <div className="input-group">
-                                    <input 
-                                        type="text" 
-                                        name="dusun" 
-                                        placeholder="Dusun/Jalan" 
-                                        className={`form-input full-width ${fieldErrors.dusun ? 'error' : ''}`}
-                                        value={formData.dusun}
-                                        onChange={handleInputChange}
-                                        required
-                                    />
-                                    {fieldErrors.dusun && <span className="error-text">{fieldErrors.dusun}</span>}
-                                </div>
-                                
-                                <div className="form-row">
-                                    <div className="input-group">
-                                        <input 
-                                            type="text" 
-                                            name="rt" 
-                                            placeholder="RT" 
-                                            className={`form-input ${fieldErrors.rt ? 'error' : ''}`}
-                                            value={formData.rt}
-                                            onChange={handleInputChange}
-                                            required
-                                        />
-                                        {fieldErrors.rt && <span className="error-text">{fieldErrors.rt}</span>}
-                                    </div>
-                                    <div className="input-group">
-                                        <input 
-                                            type="text" 
-                                            name="rw" 
-                                            placeholder="RW" 
-                                            className={`form-input ${fieldErrors.rw ? 'error' : ''}`}
-                                            value={formData.rw}
-                                            onChange={handleInputChange}
-                                            required
-                                        />
-                                        {fieldErrors.rw && <span className="error-text">{fieldErrors.rw}</span>}
-                                    </div>
-                                </div>
-
-                                <div className="form-row">
-                                    <div className="input-group">
-                                        <select 
-                                            name="provinsi" 
-                                            className={`form-input ${fieldErrors.provinsi ? 'error' : ''}`}
-                                            value={formData.provinsi}
-                                            onChange={handleInputChange}
-                                            required
-                                        >
-                                            <option value="">Pilih Provinsi</option>
-                                            {provinces.map(province => (
-                                                <option key={province.id} value={province.name}>
-                                                    {province.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {fieldErrors.provinsi && <span className="error-text">{fieldErrors.provinsi}</span>}
-                                    </div>
-                                    <div className="input-group">
-                                        <select 
-                                            name="kota" 
-                                            className={`form-input ${fieldErrors.kota ? 'error' : ''}`}
-                                            value={formData.kota}
-                                            onChange={handleInputChange}
-                                            disabled={!cities.length}
-                                            required
-                                        >
-                                            <option value="">Pilih Kota/Kabupaten</option>
-                                            {cities.map(city => (
-                                                <option key={city.id} value={city.name}>
-                                                    {city.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {fieldErrors.kota && <span className="error-text">{fieldErrors.kota}</span>}
-                                    </div>
-                                </div>
-
-                                <div className="form-row">
-                                    <div className="input-group">
-                                        <select 
-                                            name="kecamatan" 
-                                            className={`form-input ${fieldErrors.kecamatan ? 'error' : ''}`}
-                                            value={formData.kecamatan}
-                                            onChange={handleInputChange}
-                                            disabled={!districts.length}
-                                            required
-                                        >
-                                            <option value="">Pilih Kecamatan</option>
-                                            {districts.map(district => (
-                                                <option key={district.id} value={district.name}>
-                                                    {district.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {fieldErrors.kecamatan && <span className="error-text">{fieldErrors.kecamatan}</span>}
-                                    </div>
-                                    <div className="input-group">
-                                        <select 
-                                            name="desa" 
-                                            className={`form-input ${fieldErrors.desa ? 'error' : ''}`}
-                                            value={formData.desa}
-                                            onChange={handleInputChange}
-                                            disabled={!villages.length}
-                                            required
-                                        >
-                                            <option value="">Pilih Desa/Kelurahan</option>
-                                            {villages.map(village => (
-                                                <option key={village.id} value={village.name}>
-                                                    {village.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {fieldErrors.desa && <span className="error-text">{fieldErrors.desa}</span>}
-                                    </div>
-                                </div>
-
-                                <div className="input-group">
-                                    <input 
-                                        type="file" 
-                                        name="fotoKtp"
-                                        id="foto_ktp"
-                                        accept="image/jpeg,image/jpg,image/png" 
-                                        className={`form-input full-width file-input ${fieldErrors.fotoKtp ? 'error' : ''}`}
-                                        onChange={handleInputChange}
-                                        required
-                                    />
-                                    <small className="file-help">Format: JPG, JPEG, PNG. Maksimal 2MB</small>
-                                    {fieldErrors.fotoKtp && <span className="error-text">{fieldErrors.fotoKtp}</span>}
-                                </div>
-                            </div>
-
-                            <p className="login-link">
-                                Sudah memiliki akun? <Link to="/login">Masuk</Link>
-                            </p>
-                            
-                            <button 
-                                type="submit" 
-                                className={`btn-register ${isLoading ? 'loading' : ''} ${!isFormValid ? 'disabled' : ''}`}
+                        {/* Nama dan Jenis Kelamin */}
+                        <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                            <input
+                                type="text"
+                                name="namaLengkap"
+                                placeholder="Nama Lengkap"
+                                value={formData.namaLengkap}
+                                onChange={handleInputChange}
                                 disabled={isLoading}
-                                style={{ 
-                                    opacity: isLoading ? 0.7 : 1,
-                                    cursor: isLoading ? 'not-allowed' : 'pointer'
+                                style={{
+                                    height: '45px',
+                                    padding: '8px 12px',
+                                    border: fieldErrors.namaLengkap ? '1px solid #ff0000' : '1px solid rgba(0, 0, 0, 0.1)',
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    flex: 1,
+                                    minWidth: '48%',
+                                    boxSizing: 'border-box'
+                                }}
+                            />
+                            <select
+                                name="jenisKelamin"
+                                value={formData.jenisKelamin}
+                                onChange={handleInputChange}
+                                disabled={isLoading}
+                                style={{
+                                    height: '45px',
+                                    padding: '8px 12px',
+                                    border: fieldErrors.jenisKelamin ? '1px solid #ff0000' : '1px solid rgba(0, 0, 0, 0.1)',
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    flex: 1,
+                                    minWidth: '48%',
+                                    boxSizing: 'border-box'
                                 }}
                             >
-                                {isLoading ? 'MENDAFTAR...' : 'DAFTAR SEKARANG ➝'}
-                            </button>
-                            
-                            <p className="terms-text">
-                                *) Dengan mengklik tombol di atas, Anda menyetujui{' '}
-                                <a href="/terms" target="_blank">Ketentuan Pengguna</a> &{' '}
-                                <a href="/privacy" target="_blank">Kebijakan Privasi Kami</a>
-                            </p>
-                        </form>
-                    </div>
-                </section>
+                                <option value="">Jenis Kelamin</option>
+                                <option value="laki-laki">Laki-laki</option>
+                                <option value="perempuan">Perempuan</option>
+                            </select>
+                        </div>
+
+                        {/* No HP */}
+                        <input
+                            type="tel"
+                            name="noHp"
+                            placeholder="No Telp"
+                            value={formData.noHp}
+                            onChange={handleInputChange}
+                            disabled={isLoading}
+                            style={{
+                                height: '45px',
+                                padding: '8px 12px',
+                                border: fieldErrors.noHp ? '1px solid #ff0000' : '1px solid rgba(0, 0, 0, 0.1)',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                width: '100%',
+                                boxSizing: 'border-box'
+                            }}
+                        />
+
+                        {/* Password dan Konfirmasi */}
+                        <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                            <input
+                                type="password"
+                                name="password"
+                                placeholder="Kata Sandi"
+                                value={formData.password}
+                                onChange={handleInputChange}
+                                disabled={isLoading}
+                                style={{
+                                    height: '45px',
+                                    padding: '8px 12px',
+                                    border: fieldErrors.password ? '1px solid #ff0000' : '1px solid rgba(0, 0, 0, 0.1)',
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    flex: 1,
+                                    minWidth: '48%',
+                                    boxSizing: 'border-box'
+                                }}
+                            />
+                            <input
+                                type="password"
+                                name="confirmPassword"
+                                placeholder="Konfirmasi Kata Sandi"
+                                value={formData.confirmPassword}
+                                onChange={handleInputChange}
+                                disabled={isLoading}
+                                style={{
+                                    height: '45px',
+                                    padding: '8px 12px',
+                                    border: fieldErrors.confirmPassword ? '1px solid #ff0000' : '1px solid rgba(0, 0, 0, 0.1)',
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    flex: 1,
+                                    minWidth: '48%',
+                                    boxSizing: 'border-box'
+                                }}
+                            />
+                        </div>
+
+                        {/* Alamat Section */}
+                        <div>
+                            <h3 style={{
+                                fontSize: '18px',
+                                fontWeight: 'bold',
+                                fontFamily: "'Trebuchet MS', sans-serif",
+                                marginBottom: '8px',
+                                color: '#000',
+                                marginTop: '20px'
+                            }}>Alamat</h3>
+
+                            {/* Dusun/Jalan */}
+                            <input
+                                type="text"
+                                name="dusun"
+                                placeholder="Dusun/Jalan"
+                                value={formData.dusun}
+                                onChange={handleInputChange}
+                                disabled={isLoading}
+                                style={{
+                                    height: '45px',
+                                    padding: '8px 12px',
+                                    border: fieldErrors.dusun ? '1px solid #ff0000' : '1px solid rgba(0, 0, 0, 0.1)',
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    width: '100%',
+                                    boxSizing: 'border-box',
+                                    marginBottom: '14px'
+                                }}
+                            />
+
+                            {/* Provinsi dan Kota */}
+                            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '14px' }}>
+                                <select
+                                    name="provinsi"
+                                    value={formData.provinsi}
+                                    onChange={handleInputChange}
+                                    disabled={isLoading}
+                                    style={{
+                                        height: '45px',
+                                        padding: '8px 12px',
+                                        border: fieldErrors.provinsi ? '1px solid #ff0000' : '1px solid rgba(0, 0, 0, 0.1)',
+                                        borderRadius: '6px',
+                                        fontSize: '14px',
+                                        flex: 1,
+                                        minWidth: '48%',
+                                        boxSizing: 'border-box'
+                                    }}
+                                >
+                                    <option value="">Pilih Provinsi</option>
+                                    {provinces.map(province => (
+                                        <option key={province.id} value={province.name}>
+                                            {province.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <select
+                                    name="kota"
+                                    value={formData.kota}
+                                    onChange={handleInputChange}
+                                    disabled={!cities.length || isLoading}
+                                    style={{
+                                        height: '45px',
+                                        padding: '8px 12px',
+                                        border: fieldErrors.kota ? '1px solid #ff0000' : '1px solid rgba(0, 0, 0, 0.1)',
+                                        borderRadius: '6px',
+                                        fontSize: '14px',
+                                        flex: 1,
+                                        minWidth: '48%',
+                                        boxSizing: 'border-box'
+                                    }}
+                                >
+                                    <option value="">Pilih Kota/Kabupaten</option>
+                                    {cities.map(city => (
+                                        <option key={city.id} value={city.name}>
+                                            {city.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Kecamatan dan Desa */}
+                            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '14px' }}>
+                                <select
+                                    name="kecamatan"
+                                    value={formData.kecamatan}
+                                    onChange={handleInputChange}
+                                    disabled={!districts.length || isLoading}
+                                    style={{
+                                        height: '45px',
+                                        padding: '8px 12px',
+                                        border: fieldErrors.kecamatan ? '1px solid #ff0000' : '1px solid rgba(0, 0, 0, 0.1)',
+                                        borderRadius: '6px',
+                                        fontSize: '14px',
+                                        flex: 1,
+                                        minWidth: '48%',
+                                        boxSizing: 'border-box'
+                                    }}
+                                >
+                                    <option value="">Pilih Kecamatan</option>
+                                    {districts.map(district => (
+                                        <option key={district.id} value={district.name}>
+                                            {district.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <select
+                                    name="desa"
+                                    value={formData.desa}
+                                    onChange={handleInputChange}
+                                    disabled={!villages.length || isLoading}
+                                    style={{
+                                        height: '45px',
+                                        padding: '8px 12px',
+                                        border: fieldErrors.desa ? '1px solid #ff0000' : '1px solid rgba(0, 0, 0, 0.1)',
+                                        borderRadius: '6px',
+                                        fontSize: '14px',
+                                        flex: 1,
+                                        minWidth: '48%',
+                                        boxSizing: 'border-box'
+                                    }}
+                                >
+                                    <option value="">Pilih Desa/Kelurahan</option>
+                                    {villages.map(village => (
+                                        <option key={village.id} value={village.name}>
+                                            {village.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* RT dan RW */}
+                            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                                <input
+                                    type="text"
+                                    name="rt"
+                                    placeholder="RT"
+                                    value={formData.rt}
+                                    onChange={handleInputChange}
+                                    disabled={isLoading}
+                                    style={{
+                                        height: '45px',
+                                        padding: '8px 12px',
+                                        border: fieldErrors.rt ? '1px solid #ff0000' : '1px solid rgba(0, 0, 0, 0.1)',
+                                        borderRadius: '6px',
+                                        fontSize: '14px',
+                                        flex: 1,
+                                        minWidth: '48%',
+                                        boxSizing: 'border-box'
+                                    }}
+                                />
+                                <input
+                                    type="text"
+                                    name="rw"
+                                    placeholder="RW"
+                                    value={formData.rw}
+                                    onChange={handleInputChange}
+                                    disabled={isLoading}
+                                    style={{
+                                        height: '45px',
+                                        padding: '8px 12px',
+                                        border: fieldErrors.rw ? '1px solid #ff0000' : '1px solid rgba(0, 0, 0, 0.1)',
+                                        borderRadius: '6px',
+                                        fontSize: '14px',
+                                        flex: 1,
+                                        minWidth: '48%',
+                                        boxSizing: 'border-box'
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Upload Foto KTP */}
+                        <div style={{ marginTop: '20px' }}>
+                            <label style={{
+                                fontSize: '14px',
+                                fontWeight: 'bold',
+                                marginBottom: '8px',
+                                display: 'block',
+                                color: '#000'
+                            }}>
+                                Upload Foto KTP
+                            </label>
+                            <input
+                                type="file"
+                                name="fotoKtp"
+                                accept="image/jpeg,image/jpg,image/png"
+                                onChange={handleInputChange}
+                                disabled={isLoading}
+                                style={{
+                                    height: '45px',
+                                    padding: '8px 12px',
+                                    border: fieldErrors.fotoKtp ? '1px solid #ff0000' : '1px solid rgba(0, 0, 0, 0.1)',
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    width: '100%',
+                                    boxSizing: 'border-box'
+                                }}
+                            />
+                            {fieldErrors.fotoKtp && (
+                                <span style={{ color: '#ff0000', fontSize: '12px' }}>
+                                    {fieldErrors.fotoKtp}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Error untuk field lainnya */}
+                        {Object.keys(fieldErrors).map(field => {
+                            if (['email', 'password', 'confirmPassword', 'noHp', 'fotoKtp'].includes(field)) return null;
+                            return (
+                                <span key={field} style={{ color: '#ff0000', fontSize: '12px' }}>
+                                    {fieldErrors[field]}
+                                </span>
+                            );
+                        })}
+
+                        {/* Submit Button */}
+                        <button
+                            type="submit"
+                            disabled={!isFormValid || isLoading}
+                            style={{
+                                height: '50px',
+                                background: isFormValid && !isLoading 
+                                    ? 'linear-gradient(90deg, #4CEA53 0%, #00A100 100%)' 
+                                    : '#cccccc',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '16px',
+                                fontWeight: 'bold',
+                                cursor: isFormValid && !isLoading ? 'pointer' : 'not-allowed',
+                                width: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                marginTop: '20px'
+                            }}
+                        >
+                            {isLoading ? 'Mendaftar...' : 'DAFTAR'}
+                        </button>
+
+                        {/* Login Link */}
+                        <div style={{
+                            textAlign: 'center',
+                            marginTop: '20px'
+                        }}>
+                            <span style={{ fontSize: '14px', color: '#666' }}>
+                                Sudah punya akun? 
+                                <Link 
+                                    to="/login" 
+                                    style={{ 
+                                        color: '#1A35B5', 
+                                        textDecoration: 'none',
+                                        fontWeight: 'bold',
+                                        marginLeft: '5px'
+                                    }}
+                                >
+                                    Login di sini
+                                </Link>
+                            </span>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
-    );
-};
+    </div>
+);
+
+}
 
 export default Register;

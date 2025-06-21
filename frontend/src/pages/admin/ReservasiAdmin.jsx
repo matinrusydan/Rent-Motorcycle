@@ -1,35 +1,34 @@
 // frontend/src/pages/admin/ReservasiAdmin.jsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // Tambahkan useCallback
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios'; // Impor axios
-import Sidebar from '../../components/admin/Sidebar.jsx'; 
+import axios from 'axios';
+import Sidebar from '../../components/admin/Sidebar.jsx';
 
 // CSS yang relevan
-import '../../assets/css/admin/dashboard.css';   // Untuk gaya admin umum (cards, topbar, dll.)
-import '../../assets/css/admin/sidebar.css';    // Untuk gaya sidebar
-import '../../assets/css/admin/reservasi.css';  // CSS khusus untuk halaman reservasi
-import '../../assets/css/global.css';          // Global CSS
+import '../../assets/css/admin/dashboard.css';
+import '../../assets/css/admin/sidebar.css';
+import '../../assets/css/admin/reservasi.css';
+import '../../assets/css/global.css';
 
 const ReservasiAdmin = () => {
-    const [reservations, setReservations] = useState([]); // Data reservasi akan diambil dari backend
+    const [reservations, setReservations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
-    const [refreshTrigger, setRefreshTrigger] = useState(0); // Untuk memicu refresh data
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const navigate = useNavigate();
 
-    // Get API URL
     const getApiUrl = () => {
         return import.meta.env.VITE_APP_API_URL || 'http://localhost:5000';
     };
 
     // Fungsi untuk mengambil data reservasi dari backend
-    const fetchReservations = async () => {
+    const fetchReservations = useCallback(async () => { // Gunakan useCallback
         setLoading(true);
         try {
-            const token = localStorage.getItem('token'); // Ambil token
+            const token = localStorage.getItem('token');
             if (!token) {
                 alert('Sesi Anda berakhir, silakan login kembali.');
                 navigate('/login');
@@ -37,45 +36,44 @@ const ReservasiAdmin = () => {
                 return;
             }
 
-            // Endpoint untuk mendapatkan semua reservasi (akan kita buat di backend)
-            const response = await axios.get(`${getApiUrl()}/api/admin/reservations`, { 
+            const response = await axios.get(`${getApiUrl()}/api/admin/reservations`, {
                 headers: {
                     Authorization: `Bearer ${token}`
                 },
-                timeout: 15000 // 15 detik timeout
+                timeout: 15000
             });
-            // Asumsi data reservasi ada di response.data.data, dan status sudah ada
-            setReservations(response.data.data); 
+            setReservations(response.data.data);
         } catch (error) {
             console.error('Error fetching reservations:', error);
-            alert(`Gagal memuat data reservasi: ${error.response?.data?.message || error.message}. Pastikan Anda login sebagai admin.`);
+            // Tangkap pesan error dari backend jika ada, atau gunakan pesan default
+            const errorMessage = error.response?.data?.message || error.message || 'Terjadi kesalahan tidak dikenal.';
+            alert(`Gagal memuat data reservasi: ${errorMessage}. Pastikan Anda login sebagai admin.`);
             if (error.response?.status === 401 || error.response?.status === 403) {
                 navigate('/login');
             }
         } finally {
             setLoading(false);
         }
-    };
+    }, [navigate]); // Tambahkan navigate sebagai dependency
 
     // Efek untuk memuat data saat komponen di-mount atau refreshTrigger berubah
     useEffect(() => {
         fetchReservations();
-    }, [refreshTrigger, navigate]);
+    }, [refreshTrigger, fetchReservations]); // Tambahkan fetchReservations sebagai dependency
 
     // Fungsi untuk memfilter data reservasi
     const filteredReservations = reservations.filter(item => {
-        // Asumsi item.nama_lengkap, item.motor_name (jika di-join), item.status, item.no_hp dari backend
-        const matchesSearch = (item.nama_lengkap?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
-                              (item.motor_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
-                              (item.no_hp || '').includes(searchTerm);
-        const matchesStatus = filterStatus === 'all' || (item.status?.toLowerCase() || '') === filterStatus; 
+        const matchesSearch = (item.user_nama_lengkap?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || // Perbaiki nama properti
+                              (item.motor_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                              (item.user_no_hp || '').includes(searchTerm); // Perbaiki nama properti
+        const matchesStatus = filterStatus === 'all' || (item.status?.toLowerCase() || '') === filterStatus;
         return matchesSearch && matchesStatus;
     });
 
     // Fungsi untuk mendapatkan badge status
     const getStatusBadge = (status) => {
         const badges = {
-            pending: { text: 'Menunggu', class: 'status-pending', icon: '⏳' },
+            pending: { text: 'Menunggu Pembayaran', class: 'status-pending', icon: '⏳' }, // Ubah teks status
             confirmed: { text: 'Dikonfirmasi', class: 'status-confirmed', icon: '✅' },
             completed: { text: 'Selesai', class: 'status-completed', icon: '✔️' },
             cancelled: { text: 'Dibatalkan', class: 'status-cancelled', icon: '❌' }
@@ -93,36 +91,36 @@ const ReservasiAdmin = () => {
         });
     };
 
-    // Fungsi untuk mengubah status reservasi
+    // Fungsi untuk mengubah status reservasi (hanya untuk "Selesai" dan "Batalkan" sekarang)
     const handleStatusChange = async (id, newStatus) => {
         try {
             const token = localStorage.getItem('token');
             if (!confirm(`Apakah Anda yakin ingin mengubah status reservasi ini menjadi ${newStatus}?`)) {
                 return;
             }
-            // ✅ Endpoint untuk update status reservasi (akan kita buat di backend)
-            const response = await axios.put(`${getApiUrl()}/api/admin/reservations/${id}/status`, 
-                { status: newStatus }, 
+            const response = await axios.put(`${getApiUrl()}/api/admin/reservations/${id}/status`,
+                { status: newStatus },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             alert(response.data.message);
-            setRefreshTrigger(prev => prev + 1); // Memicu refresh data
+            setRefreshTrigger(prev => prev + 1);
         } catch (error) {
             console.error('Error changing reservation status:', error);
-            alert(`Gagal mengubah status reservasi: ${error.response?.data?.message || error.message}. Pastikan Anda memiliki izin admin.`);
+            const errorMessage = error.response?.data?.message || error.message || 'Terjadi kesalahan tidak dikenal.';
+            alert(`Gagal mengubah status reservasi: ${errorMessage}. Pastikan Anda memiliki izin admin.`);
         }
     };
 
     // Fungsi untuk menghubungi customer via WhatsApp
     const contactCustomer = (reservation) => {
         const message = encodeURIComponent(
-            `Halo ${reservation.nama_lengkap || reservation.namaPenyewa}, kami menghubungi Anda terkait reservasi motor ${reservation.motor_name || reservation.motor} pada tanggal ${formatDate(reservation.tanggal_sewa || reservation.tanggalSewa)}. Terima kasih.`
+            `Halo ${reservation.user_nama_lengkap}, kami menghubungi Anda terkait reservasi motor ${reservation.motor_name} pada tanggal ${formatDate(reservation.tanggal_mulai)}. Total harga: Rp ${parseFloat(reservation.total_harga).toLocaleString('id-ID')}. Terima kasih.`
         );
-        const waUrl = `https://wa.me/${reservation.no_hp || reservation.noHp}?text=${message}`;
+        const waUrl = `https://wa.me/${reservation.user_no_hp}?text=${message}`; // Gunakan user_no_hp
         window.open(waUrl, '_blank');
     };
-    
-    // Handler untuk sidebar toggle (disalin dari DashboardAdmin.jsx)
+
+    // Handler untuk sidebar toggle
     const [isSidebarToggled, setIsSidebarToggled] = useState(false);
     useEffect(() => {
         if (isSidebarToggled) {
@@ -131,11 +129,11 @@ const ReservasiAdmin = () => {
             document.body.classList.remove('sidebar-toggled');
         }
         const handleResize = () => {
-            if (window.innerWidth < 768) setIsSidebarToggled(true); 
-            else setIsSidebarToggled(false); 
+            if (window.innerWidth < 768) setIsSidebarToggled(true);
+            else setIsSidebarToggled(false);
         };
         window.addEventListener('resize', handleResize);
-        handleResize(); 
+        handleResize();
         return () => { window.removeEventListener('resize', handleResize); };
     }, [isSidebarToggled]);
     const handleSidebarToggle = () => setIsSidebarToggled(!isSidebarToggled);
@@ -147,34 +145,6 @@ const ReservasiAdmin = () => {
                 <Sidebar />
                 <div id="content-wrapper" className={`d-flex flex-column ${isSidebarToggled ? 'toggled' : ''}`}>
                     <div id="content">
-                        {/* Topbar Placeholder */}
-                        <nav className="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
-                            <button id="sidebarToggleTop" className="btn btn-link d-md-none rounded-circle mr-3" onClick={handleSidebarToggle}>
-                                <i className="fa fa-bars"></i>
-                            </button>
-                            <ul className="navbar-nav ml-auto">
-                                <li className="nav-item dropdown no-arrow">
-                                    <a className="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
-                                        data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                        <span className="mr-2 d-none d-lg-inline text-gray-600 small">Admin</span>
-                                        <img className="img-profile rounded-circle"
-                                            src="http://via.placeholder.com/40x40" alt="Profile" />
-                                    </a>
-                                    <div className="dropdown-menu dropdown-menu-right shadow animated--grow-in"
-                                        aria-labelledby="userDropdown">
-                                        <Link className="dropdown-item" to="/admin/settings">
-                                            <i className="fas fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i>
-                                            Settings
-                                        </Link>
-                                        <div className="dropdown-divider"></div>
-                                        <a className="dropdown-item" href="#" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login'); }}>
-                                            <i className="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
-                                            Logout
-                                        </a>
-                                    </div>
-                                </li>
-                            </ul>
-                        </nav>
                         <div className="loading-container">
                             <div className="loading-spinner">⏳</div>
                             <p>Memuat data reservasi...</p>
@@ -198,35 +168,6 @@ const ReservasiAdmin = () => {
 
             <div id="content-wrapper" className="d-flex flex-column">
                 <div id="content">
-                    {/* Topbar */}
-                    <nav className="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
-                        <button id="sidebarToggleTop" className="btn btn-link d-md-none rounded-circle mr-3" onClick={handleSidebarToggle}>
-                            <i className="fa fa-bars"></i>
-                        </button>
-                        <ul className="navbar-nav ml-auto">
-                            <li className="nav-item dropdown no-arrow">
-                                <a className="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
-                                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                    <span className="mr-2 d-none d-lg-inline text-gray-600 small">Admin</span>
-                                    <img className="img-profile rounded-circle"
-                                        src="http://via.placeholder.com/40x40" alt="Profile" />
-                                </a>
-                                <div className="dropdown-menu dropdown-menu-right shadow animated--grow-in"
-                                    aria-labelledby="userDropdown">
-                                    <Link className="dropdown-item" to="/admin/settings">
-                                        <i className="fas fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i>
-                                        Settings
-                                    </Link>
-                                    <div className="dropdown-divider"></div>
-                                    <a className="dropdown-item" href="#" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login'); }}>
-                                        <i className="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
-                                        Logout
-                                    </a>
-                                </div>
-                            </li>
-                        </ul>
-                    </nav>
-
                     <div className="container-fluid">
                         <div className="admin-header">
                             <div className="header-left">
@@ -253,17 +194,17 @@ const ReservasiAdmin = () => {
                                             placeholder="Cari nama, motor, atau nomor HP..."
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
-                                            className="form-control" 
+                                            className="form-control"
                                         />
                                     </div>
                                     <div className="filter-group">
                                         <select
                                             value={filterStatus}
                                             onChange={(e) => setFilterStatus(e.target.value)}
-                                            className="form-select" 
+                                            className="form-select"
                                         >
                                             <option value="all">Semua Status</option>
-                                            <option value="pending">Menunggu</option>
+                                            <option value="pending">Menunggu Pembayaran</option> {/* Ubah teks */}
                                             <option value="confirmed">Dikonfirmasi</option>
                                             <option value="completed">Selesai</option>
                                             <option value="cancelled">Dibatalkan</option>
@@ -302,13 +243,13 @@ const ReservasiAdmin = () => {
                                                             <td>{res.id}</td>
                                                             <td>
                                                                 <div className="customer-info">
-                                                                    <div className="customer-name">{res.nama_lengkap}</div> {/* Asumsi dari backend */}
-                                                                    <div className="customer-phone">{res.no_hp}</div> {/* Asumsi dari backend */}
+                                                                    <div className="customer-name">{res.user_nama_lengkap}</div> {/* Nama properti dari backend */}
+                                                                    <div className="customer-phone">{res.user_no_hp}</div> {/* Nama properti dari backend */}
                                                                 </div>
                                                             </td>
-                                                            <td>{res.motor_name}</td> {/* Asumsi motor_name dari join */}
-                                                            <td>{formatDate(res.tanggal_sewa)}</td>
-                                                            <td>{res.lama_sewa_hari} hari</td>
+                                                            <td>{res.motor_name}</td>
+                                                            <td>{formatDate(res.tanggal_mulai)}</td> {/* Gunakan tanggal_mulai dari backend */}
+                                                            <td>{res.lama_sewa} hari</td> {/* Gunakan lama_sewa dari backend */}
                                                             <td>
                                                                 <span className={`badge ${statusBadge.class}`}>
                                                                     {statusBadge.icon} {statusBadge.text}
@@ -317,31 +258,27 @@ const ReservasiAdmin = () => {
                                                             <td>{res.catatan}</td>
                                                             <td>
                                                                 <div className="d-flex flex-column">
-                                                                    {res.status.toLowerCase() === 'pending' && (
-                                                                        <>
-                                                                            <button 
-                                                                                className="btn btn-success btn-sm mb-1"
-                                                                                onClick={() => handleStatusChange(res.id, 'Confirmed')}
-                                                                            >
-                                                                                Konfirmasi
-                                                                            </button>
-                                                                            <button 
-                                                                                className="btn btn-danger btn-sm mb-1"
-                                                                                onClick={() => handleStatusChange(res.id, 'Cancelled')}
-                                                                            >
-                                                                                Batalkan
-                                                                            </button>
-                                                                        </>
-                                                                    )}
-                                                                    {res.status.toLowerCase() === 'confirmed' && (
-                                                                        <button 
+                                                                    {/* HAPUS TOMBOL KONFIRMASI JIKA STATUS PENDING */}
+                                                                    {/* Karena konfirmasi akan dilakukan dari persetujuan pembayaran */}
+                                                                    
+                                                                    {res.status.toLowerCase() === 'confirmed' && ( // Tombol Selesai hanya jika sudah dikonfirmasi
+                                                                        <button
                                                                             className="btn btn-primary btn-sm mb-1"
-                                                                            onClick={() => handleStatusChange(res.id, 'Completed')}
+                                                                            onClick={() => handleStatusChange(res.id, 'completed')} // Status 'completed'
                                                                         >
                                                                             Selesai
                                                                         </button>
                                                                     )}
-                                                                    <button 
+                                                                    {/* Tombol Batalkan selalu ada jika belum selesai/dibatalkan */}
+                                                                    {res.status.toLowerCase() !== 'cancelled' && res.status.toLowerCase() !== 'completed' && (
+                                                                        <button
+                                                                            className="btn btn-danger btn-sm mb-1"
+                                                                            onClick={() => handleStatusChange(res.id, 'cancelled')} // Status 'cancelled'
+                                                                        >
+                                                                            Batalkan
+                                                                        </button>
+                                                                    )}
+                                                                    <button
                                                                         className="btn btn-info btn-sm"
                                                                         onClick={() => contactCustomer(res)}
                                                                     >
@@ -366,7 +303,7 @@ const ReservasiAdmin = () => {
                         </div>
                     </div>
                 </div>
-                
+
                 {/* Footer Admin */}
                 <footer className="sticky-footer bg-white">
                     <div className="container my-auto">

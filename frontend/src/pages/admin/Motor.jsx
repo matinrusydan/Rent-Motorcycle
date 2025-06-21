@@ -26,6 +26,7 @@ const Motor = () => {
     const [currentMotor, setCurrentMotor] = useState(null);
     const [error, setError] = useState(null);
     const [submitLoading, setSubmitLoading] = useState(false);
+    const [viewMode, setViewMode] = useState('grid'); // New state for view toggle
     const [formData, setFormData] = useState({
         brand: '',
         type: '',
@@ -106,6 +107,7 @@ const Motor = () => {
         console.log('openModal called with:', mode, motor);
         
         setModalMode(mode);
+        
         setCurrentMotor(motor);
         setError(null);
         
@@ -133,6 +135,7 @@ const Motor = () => {
         
         // FIXED: Simple state update
         setShowModal(true);
+        console.log('setShowModal(true) called');
     };
 
     const closeModal = () => {
@@ -249,19 +252,22 @@ const Motor = () => {
     // FIXED: Simplified button click handler
     const handleAddButtonClick = () => {
         console.log('Add button clicked!');
+        console.log('showModal before:', showModal);
         openModal('add');
+        console.log('showModal after openModal called');
     };
 
     const getStatusBadge = (status) => {
         const statusConfig = {
-            available: { class: 'status-available', text: 'Tersedia', icon: '✅' },
-            rented: { class: 'status-rented', text: 'Disewa', icon: '🚗' },
-            maintenance: { class: 'status-maintenance', text: 'Maintenance', icon: '🔧' }
+            available: { class: 'status-available', text: 'Tersedia', icon: '🟢' },
+            rented: { class: 'status-rented', text: 'Disewa', icon: '🔴' },
+            maintenance: { class: 'status-maintenance', text: 'Maintenance', icon: '🟡' }
         };
         const config = statusConfig[status] || statusConfig.available;
         return (
             <span className={`status-badge ${config.class}`}>
-                {config.icon} {config.text}
+                <span className="status-dot"></span>
+                {config.text}
             </span>
         );
     };
@@ -291,40 +297,10 @@ const Motor = () => {
             <div className="admin-layout">
                 <Sidebar />
                 <div className="admin-content">
-                    {/* Topbar */}
-                    <nav className="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
-                        <button id="sidebarToggleTop" className="btn btn-link d-md-none rounded-circle mr-3" onClick={handleSidebarToggle}>
-                            <i className="fa fa-bars"></i>
-                        </button>
-                        
-                        <ul className="navbar-nav ml-auto">
-                            <li className="nav-item dropdown no-arrow">
-                                <a className="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
-                                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                    <span className="mr-2 d-none d-lg-inline text-gray-600 small">Admin</span>
-                                    <img className="img-profile rounded-circle"
-                                        src="http://via.placeholder.com/40x40" alt="Profile" />
-                                </a>
-                                <div className="dropdown-menu dropdown-menu-right shadow animated--grow-in"
-                                    aria-labelledby="userDropdown">
-                                    <Link className="dropdown-item" to="/admin/settings">
-                                        <i className="fas fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i>
-                                        Settings
-                                    </Link>
-                                    <div className="dropdown-divider"></div>
-                                    <a className="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#logoutModal">
-                                        <i className="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
-                                        Logout
-                                    </a>
-                                </div>
-                            </li>
-                        </ul>
-                    </nav>
-                    {/* End of Topbar */}
-                    
-                    <div className="loading-container">
-                        <div className="loading-spinner">⏳</div>
-                        <p>Memuat data motor...</p>
+                    <div className="loading-state">
+                        <div className="loading-spinner"></div>
+                        <h3>Memuat Data Motor</h3>
+                        <p>Mohon tunggu sebentar...</p>
                     </div>
                 </div>
             </div>
@@ -336,377 +312,614 @@ const Motor = () => {
             <Sidebar />
             
             <main className="admin-content">
-                {/* Topbar */}
-                <nav className="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
-                    <button id="sidebarToggleTop" className="btn btn-link d-md-none rounded-circle mr-3" onClick={handleSidebarToggle}>
-                        <i className="fa fa-bars"></i>
-                    </button>
-                    
-                    <ul className="navbar-nav ml-auto">
-                        <li className="nav-item dropdown no-arrow">
-                            <a className="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
-                                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                <span className="mr-2 d-none d-lg-inline text-gray-600 small">Admin</span>
-                                <img className="img-profile rounded-circle"
-                                    src="http://via.placeholder.com/40x40" alt="Profile" />
-                            </a>
-                            <div className="dropdown-menu dropdown-menu-right shadow animated--grow-in"
-                                aria-labelledby="userDropdown">
-                                <Link className="dropdown-item" to="/admin/settings">
-                                    <i className="fas fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i>
-                                    Settings
-                                </Link>
-                                <div className="dropdown-divider"></div>
-                                <a className="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#logoutModal">
-                                    <i className="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
-                                    Logout
-                                </a>
+                <div className="page-container">
+                    {/* Page Header */}
+                    <div className="page-header">
+                        <div className="header-content">
+                            <div className="header-text">
+                                <h1 className="page-title">
+                                    <div className="title-icon">
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M12 2L13.09 8.26L20 9L13.09 9.74L12 16L10.91 9.74L4 9L10.91 8.26L12 2Z"/>
+                                        </svg>
+                                    </div>
+                                    Manajemen Motor
+                                </h1>
+                                <p className="page-subtitle">
+                                    Kelola inventaris motor yang tersedia untuk disewa
+                                </p>
                             </div>
-                        </li>
-                    </ul>
-                </nav>
-                {/* End of Topbar */}
-
-                <div className="motor-container">
-                    {error && (
-                        <div className="error-alert">
-                            <span className="error-icon">⚠️</span>
-                            {error}
-                            <button 
-                                className="error-close"
-                                onClick={() => setError(null)}
-                            >
-                                ✖️
-                            </button>
-                        </div>
-                    )}
-
-                    <div className="motor-header">
-                        <div className="header-left">
-                            <h1 className="motor-title">
-                                <span className="title-icon">🏍️</span>
-                                Manajemen Motor
-                            </h1>
-                            <p className="motor-subtitle">
-                                Kelola data motor yang tersedia untuk disewa
-                            </p>
-                        </div>
-                        <div className="header-right">
-                            {/* FIXED: Simplified button */}
-                            <button 
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={handleAddButtonClick}
-                            >
-                                ➕ Tambah Motor
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Stats */}
-                    <div className="motor-stats">
-                        <div className="stat-card">
-                            <div className="stat-icon">🏍️</div>
-                            <div className="stat-info">
-                                <h3>{motorStats.total}</h3>
-                                <p>Total Motor</p>
+                            <div className="header-actions">
+                                <button 
+                                    className="btn-primary"
+                                    onClick={handleAddButtonClick}
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                    Tambah Motor
+                                </button>
                             </div>
                         </div>
-                        <div className="stat-card">
-                            <div className="stat-icon">✅</div>
-                            <div className="stat-info">
-                                <h3>{motorStats.available}</h3>
-                                <p>Tersedia</p>
-                            </div>
-                        </div>
-                        <div className="stat-card">
-                            <div className="stat-icon">🚗</div>
-                            <div className="stat-info">
-                                <h3>{motorStats.rented}</h3>
-                                <p>Disewa</p>
-                            </div>
-                        </div>
-                        <div className="stat-card">
-                            <div className="stat-icon">🔧</div>
-                            <div className="stat-info">
-                                <h3>{motorStats.maintenance}</h3>
-                                <p>Maintenance</p>
-                            </div>
-                        </div>
-                    </div>
 
-                    {/* Filters */}
-                    <div className="motor-filters">
-                        <div className="filter-group">
-                            <div className="search-box">
-                                <input
-                                    type="text"
-                                    placeholder="Cari berdasarkan merk, tipe, atau spesifikasi..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="search-input"
-                                />
-                                <span className="search-icon">🔍</span>
-                            </div>
-                            
-                            <select
-                                value={brandFilter}
-                                onChange={(e) => setBrandFilter(e.target.value)}
-                                className="filter-select"
-                            >
-                                <option value="all">Semua Merk</option>
-                                {getUniqueBrands().map(brand => (
-                                    <option key={brand} value={brand}>{brand}</option>
-                                ))}
-                            </select>
-
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="filter-select"
-                            >
-                                <option value="all">Semua Status</option>
-                                <option value="available">Tersedia</option>
-                                <option value="rented">Disewa</option>
-                                <option value="maintenance">Maintenance</option>
-                            </select>
-                        </div>
-
-                        <div className="bulk-actions">
-                            <button 
-                                className="btn btn-danger"
-                                onClick={handleBulkDelete}
-                                disabled={selectedIds.length === 0}
-                            >
-                                🗑️ Hapus Terpilih ({selectedIds.length})
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Data Table */}
-                    <div className="motor-table-container">
-                        <table className="motor-table">
-                            <thead>
-                                <tr>
-                                    <th>
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedIds.length === motorData.length && motorData.length > 0}
-                                            onChange={handleSelectAll}
-                                        />
-                                    </th>
-                                    <th>Motor</th>
-                                    <th>Spesifikasi</th>
-                                    <th>Harga</th>
-                                    <th>Status</th>
-                                    <th>Tanggal Ditambah</th>
-                                    <th>Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {motorData.map((item) => (
-                                    <tr key={item.id}>
-                                        <td>
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.includes(item.id)}
-                                                onChange={() => handleCheckboxChange(item.id)}
-                                            />
-                                        </td>
-                                        <td>
-                                            <div className="motor-info">
-                                                <div className="motor-image">
-                                                    {item.image ? (
-                                                        <img 
-                                                            src={getImageUrl(item.image)} 
-                                                            alt={`${item.brand} ${item.type}`}
-                                                            onError={(e) => {
-                                                                e.target.style.display = 'none';
-                                                                e.target.nextSibling.style.display = 'block';
-                                                            }}
-                                                        />
-                                                    ) : null}
-                                                    <div className="motor-placeholder" style={{display: item.image ? 'none' : 'block'}}>
-                                                        🏍️
-                                                    </div>
-                                                </div>
-                                                <div className="motor-details">
-                                                    <strong>{item.brand} {item.type}</strong>
-                                                    <p>{item.description}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span className="specs-text">{item.specs}</span>
-                                        </td>
-                                        <td>
-                                            <span className="price-text">{formatPrice(item.price)}</span>
-                                        </td>
-                                        <td>
-                                            {getStatusBadge(item.status)}
-                                        </td>
-                                        <td>
-                                            <span className="date-text">{formatDate(item.created_at)}</span>
-                                        </td>
-                                        <td>
-                                            <div className="action-buttons">
-                                                <button 
-                                                    className="btn btn-sm btn-secondary"
-                                                    onClick={() => openModal('edit', item)}
-                                                    title="Edit Motor"
-                                                >
-                                                    ✏️
-                                                </button>
-                                                <button 
-                                                    className="btn btn-sm btn-danger"
-                                                    onClick={() => handleDelete(item.id)}
-                                                    title="Hapus Motor"
-                                                >
-                                                    🗑️
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-
-                        {motorData.length === 0 && !loading && (
-                            <div className="empty-state">
-                                <div className="empty-icon">🏍️</div>
-                                <h3>Tidak ada motor ditemukan</h3>
-                                <p>Coba ubah filter pencarian atau tambah motor baru</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </main>
-
-            {/* FIXED: Modal - Always render when showModal is true */}
-            {showModal && (
-                <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && closeModal()}>
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h3>{modalMode === 'add' ? 'Tambah Motor Baru' : 'Edit Motor'}</h3>
-                            <button className="modal-close" onClick={closeModal} type="button">
-                                ✖️
-                            </button>
-                        </div>
-                        
+                        {/* Error Alert */}
                         {error && (
-                            <div className="modal-error">
-                                <span className="error-icon">⚠️</span>
-                                {error}
+                            <div className="alert alert-error">
+                                <div className="alert-icon">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                    </svg>
+                                </div>
+                                <div className="alert-content">
+                                    <p>{error}</p>
+                                </div>
+                                <button 
+                                    className="alert-close"
+                                    onClick={() => setError(null)}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
                             </div>
                         )}
+                    </div>
 
-                        <form onSubmit={handleFormSubmit} className="modal-form">
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label htmlFor="brand">Merk Motor *</label>
-                                    <select
-                                        id="brand"
-                                        value={formData.brand}
-                                        onChange={(e) => setFormData({...formData, brand: e.target.value})}
-                                        required
-                                    >
-                                        <option value="">Pilih Merk</option>
-                                        <option value="Honda">Honda</option>
-                                        <option value="Yamaha">Yamaha</option>
-                                        <option value="Suzuki">Suzuki</option>
-                                        <option value="Kawasaki">Kawasaki</option>
-                                        <option value="TVS">TVS</option>
-                                    </select>
+                    {/* Stats Dashboard */}
+                    <div className="stats-grid">
+                        <div className="stat-card">
+                            <div className="stat-header">
+                                <div className="stat-icon stat-icon-primary">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2L22 22H2L12 2Z"/>
+                                    </svg>
                                 </div>
-                                <div className="form-group">
-                                    <label htmlFor="type">Tipe Motor *</label>
+                                <div className="stat-trend">
+                                    <span className="trend-up">+12%</span>
+                                </div>
+                            </div>
+                            <div className="stat-content">
+                                <h3 className="stat-number">{motorStats.total}</h3>
+                                <p className="stat-label">Total Motor</p>
+                            </div>
+                        </div>
+
+                        <div className="stat-card">
+                            <div className="stat-header">
+                                <div className="stat-icon stat-icon-success">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                                <div className="stat-trend">
+                                    <span className="trend-up">+8%</span>
+                                </div>
+                            </div>
+                            <div className="stat-content">
+                                <h3 className="stat-number">{motorStats.available}</h3>
+                                <p className="stat-label">Tersedia</p>
+                            </div>
+                        </div>
+
+                        <div className="stat-card">
+                            <div className="stat-header">
+                                <div className="stat-icon stat-icon-warning">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2L2 22h20L12 2z"/>
+                                    </svg>
+                                </div>
+                                <div className="stat-trend">
+                                    <span className="trend-down">-3%</span>
+                                </div>
+                            </div>
+                            <div className="stat-content">
+                                <h3 className="stat-number">{motorStats.rented}</h3>
+                                <p className="stat-label">Disewa</p>
+                            </div>
+                        </div>
+
+                        <div className="stat-card">
+                            <div className="stat-header">
+                                <div className="stat-icon stat-icon-danger">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2L2 22h20L12 2z"/>
+                                    </svg>
+                                </div>
+                                <div className="stat-trend">
+                                    <span className="trend-neutral">0%</span>
+                                </div>
+                            </div>
+                            <div className="stat-content">
+                                <h3 className="stat-number">{motorStats.maintenance}</h3>
+                                <p className="stat-label">Maintenance</p>
+                            </div>
+                        </div>
+                    </div>
+
+
+
+                    {/* Filters & Controls */}
+                    <div className="controls-section">
+                        <div className="search-filters">
+                            <div className="search-box">
+                                <div className="search-input-wrapper">
+                                    <svg className="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <circle cx="11" cy="11" r="8"></circle>
+                                        <path d="m21 21-4.35-4.35"></path>
+                                    </svg>
                                     <input
                                         type="text"
-                                        id="type"
-                                        value={formData.type}
-                                        onChange={(e) => setFormData({...formData, type: e.target.value})}
-                                        placeholder="Contoh: Beat, Vario, NMAX"
-                                        required
+                                        placeholder="Cari berdasarkan merk, tipe, atau spesifikasi..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="search-input"
                                     />
+                                    {searchTerm && (
+                                        <button 
+                                            className="search-clear"
+                                            onClick={() => setSearchTerm('')}
+                                        >
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                                            </svg>
+                                        </button>
+                                    )}
                                 </div>
                             </div>
-                            
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label htmlFor="price">Harga Sewa (per hari) *</label>
-                                    <input
-                                        type="number"
-                                        id="price"
-                                        value={formData.price}
-                                        onChange={(e) => setFormData({...formData, price: e.target.value})}
-                                        placeholder="80000"
-                                        min="1"
-                                        step="1000"
-                                        required
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="status">Status</label>
+
+                            <div className="filter-group">
+                                <div className="filter-item">
+                                    <label>Merk</label>
                                     <select
-                                        id="status"
-                                        value={formData.status}
-                                        onChange={(e) => setFormData({...formData, status: e.target.value})}
-                                        required
+                                        value={brandFilter}
+                                        onChange={(e) => setBrandFilter(e.target.value)}
+                                        className="filter-select"
                                     >
+                                        <option value="all">Semua Merk</option>
+                                        {getUniqueBrands().map(brand => (
+                                            <option key={brand} value={brand}>{brand}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="filter-item">
+                                    <label>Status</label>
+                                    <select
+                                        value={statusFilter}
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                        className="filter-select"
+                                    >
+                                        <option value="all">Semua Status</option>
                                         <option value="available">Tersedia</option>
                                         <option value="rented">Disewa</option>
                                         <option value="maintenance">Maintenance</option>
                                     </select>
                                 </div>
                             </div>
+                        </div>
 
-                            <div className="form-group">
-                                <label htmlFor="specs">Spesifikasi</label>
-                                <input
-                                    type="text"
-                                    id="specs"
-                                    value={formData.specs}
-                                    onChange={(e) => setFormData({...formData, specs: e.target.value})}
-                                    placeholder="110cc • Matic • Hemat BBM"
-                                />
+                        <div className="view-controls">
+                            <div className="view-toggle">
+                                <button 
+                                    className={`toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                                    onClick={() => setViewMode('grid')}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                        <rect x="3" y="3" width="7" height="7"></rect>
+                                        <rect x="14" y="3" width="7" height="7"></rect>
+                                        <rect x="14" y="14" width="7" height="7"></rect>
+                                        <rect x="3" y="14" width="7" height="7"></rect>
+                                    </svg>
+                                    Grid
+                                </button>
+                                <button 
+                                    className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
+                                    onClick={() => setViewMode('list')}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                        <line x1="8" y1="6" x2="21" y2="6"></line>
+                                        <line x1="8" y1="12" x2="21" y2="12"></line>
+                                        <line x1="8" y1="18" x2="21" y2="18"></line>
+                                        <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                        <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                        <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                                    </svg>
+                                    List
+                                </button>
                             </div>
 
-                            <div className="form-group">
-                                <label htmlFor="description">Deskripsi</label>
-                                <textarea
-                                    id="description"
-                                    value={formData.description}
-                                    onChange={(e) => setFormData({...formData, description: e.target.value})}
-                                    placeholder="Deskripsi singkat tentang motor"
-                                    rows="3"
-                                />
-                            </div>
+                            {selectedIds.length > 0 && (
+                                <div className="bulk-actions">
+                                    <span className="selected-count">{selectedIds.length} dipilih</span>
+                                    <button 
+                                        className="btn-danger-outline"
+                                        onClick={handleBulkDelete}
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <polyline points="3,6 5,6 21,6"></polyline>
+                                            <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"></path>
+                                        </svg>
+                                        Hapus
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
 
-                            <div className="form-group">
-                                <label htmlFor="image">Gambar Motor</label>
-                                <input
-                                    type="file"
-                                    id="image"
-                                    accept="image/*"
-                                    onChange={(e) => setFormData({...formData, image: e.target.files[0]})}
-                                />
-                                <small className="form-text">Format: JPG, PNG, maksimal 5MB</small>
-                                {modalMode === 'edit' && currentMotor?.image && (
-                                    <div className="current-image">
-                                        <small>Gambar saat ini:</small>
-                                        <img 
-                                            src={getImageUrl(currentMotor.image)} 
-                                            alt="Current"
-                                            style={{maxWidth: '100px', maxHeight: '100px', objectFit: 'cover'}}
-                                        />
+                    {/* Content Area */}
+                    <div className="content-section">
+                        {viewMode === 'grid' ? (
+                            // Grid View
+                            <div className="motor-grid">
+                                {motorData.map((motor) => (
+                                    <div key={motor.id} className="motor-card">
+                                        <div className="card-header">
+                                            <div className="card-checkbox">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.includes(motor.id)}
+                                                    onChange={() => handleCheckboxChange(motor.id)}
+                                                />
+                                            </div>
+                                            <div className="card-status">
+                                                {getStatusBadge(motor.status)}
+                                            </div>
+                                        </div>
+
+                                        <div className="card-image">
+                                            {motor.image ? (
+                                                <img 
+                                                    src={getImageUrl(motor.image)} 
+                                                    alt={`${motor.brand} ${motor.type}`}
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                        e.target.nextSibling.style.display = 'flex';
+                                                    }}
+                                                />
+                                            ) : null}
+                                            <div className="image-placeholder" style={{display: motor.image ? 'none' : 'flex'}}>
+                                                <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M12 2L22 22H2L12 2Z"/>
+                                                </svg>
+                                            </div>
+                                        </div>
+
+                                        <div className="card-content">
+                                            <div className="motor-title">
+                                                <h3>{motor.brand} {motor.type}</h3>
+                                                <p className="motor-specs">{motor.specs}</p>
+                                            </div>
+                                            
+                                            <div className="motor-description">
+                                                <p>{motor.description}</p>
+                                            </div>
+
+                                            <div className="motor-price">
+                                                <span className="price-amount">{formatPrice(motor.price)}</span>
+                                            </div>
+
+                                            <div className="motor-meta">
+                                                <span className="meta-date">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                                    </svg>
+                                                    {formatDate(motor.created_at)}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="card-actions">
+                                            <button 
+                                                className="action-btn edit-btn"
+                                                onClick={() => openModal('edit', motor)}
+                                                title="Edit Motor"
+                                            >
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                </svg>
+                                                Edit
+                                            </button>
+                                            <button 
+                                                className="action-btn delete-btn"
+                                                onClick={() => handleDelete(motor.id)}
+                                                title="Hapus Motor"
+                                            >
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <polyline points="3,6 5,6 21,6"></polyline>
+                                                    <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"></path>
+                                                </svg>
+                                                Hapus
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            // List View
+                            <div className="motor-table-container">
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th className="checkbox-col">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.length === motorData.length && motorData.length > 0}
+                                                    onChange={handleSelectAll}
+                                                />
+                                            </th>
+                                            <th>Motor</th>
+                                            <th>Spesifikasi</th>
+                                            <th>Harga</th>
+                                            <th>Status</th>
+                                            <th>Tanggal</th>
+                                            <th className="actions-col">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {motorData.map((motor) => (
+                                            <tr key={motor.id} className={selectedIds.includes(motor.id) ? 'selected' : ''}>
+                                                <td>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedIds.includes(motor.id)}
+                                                        onChange={() => handleCheckboxChange(motor.id)}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <div className="table-motor-info">
+                                                        <div className="table-motor-image">
+                                                            {motor.image ? (
+                                                                <img 
+                                                                    src={getImageUrl(motor.image)} 
+                                                                    alt={`${motor.brand} ${motor.type}`}
+                                                                    onError={(e) => {
+                                                                        e.target.style.display = 'none';
+                                                                        e.target.nextSibling.style.display = 'flex';
+                                                                    }}
+                                                                />
+                                                            ) : null}
+                                                            <div className="table-image-placeholder" style={{display: motor.image ? 'none' : 'flex'}}>
+                                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                                                    <path d="M12 2L22 22H2L12 2Z"/>
+                                                                </svg>
+                                                            </div>
+                                                        </div>
+                                                        <div className="table-motor-details">
+                                                            <div className="motor-name">{motor.brand} {motor.type}</div>
+                                                            <div className="motor-desc">{motor.description}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span className="specs-badge">{motor.specs}</span>
+                                                </td>
+                                                <td>
+                                                    <span className="price-text">{formatPrice(motor.price)}</span>
+                                                </td>
+                                                <td>
+                                                    {getStatusBadge(motor.status)}
+                                                </td>
+                                                <td>
+                                                    <span className="date-text">{formatDate(motor.created_at)}</span>
+                                                </td>
+                                                <td>
+                                                    <div className="table-actions">
+                                                        <button 
+                                                            className="action-btn-sm edit-btn"
+                                                            onClick={() => openModal('edit', motor)}
+                                                            title="Edit Motor">
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                            </svg>
+                                                        </button>
+                                                        <button 
+                                                            className="action-btn-sm delete-btn"
+                                                            onClick={() => handleDelete(motor.id)}
+                                                            title="Hapus Motor"
+                                                        >
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                                <polyline points="3,6 5,6 21,6"></polyline>
+                                                                <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"></path>
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {/* Empty State */}
+                        {motorData.length === 0 && !loading && (
+                            <div className="empty-state">
+                                <div className="empty-icon">
+                                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
+                                        <circle cx="11" cy="11" r="8"></circle>
+                                        <path d="m21 21-4.35-4.35"></path>
+                                    </svg>
+                                </div>
+                                <h3>Tidak ada motor ditemukan</h3>
+                                <p>
+                                    {searchTerm || brandFilter !== 'all' || statusFilter !== 'all' 
+                                        ? 'Coba ubah filter pencarian atau tambah motor baru.' 
+                                        : 'Mulai dengan menambahkan motor pertama Anda.'
+                                    }
+                                </p>
+                                <button 
+                                    className="btn-primary"
+                                    onClick={handleAddButtonClick}
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                    Tambah Motor
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </main>
+
+            {/* Modal */}
+            {showModal && (
+                <div className="modal-overlay" onClick={closeModal}>
+                    <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">
+                                {modalMode === 'add' ? 'Tambah Motor Baru' : 'Edit Motor'}
+                            </h2>
+                            <button className="modal-close" onClick={closeModal}>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleFormSubmit} className="modal-form">
+                            <div className="modal-body">
+                                {error && (
+                                    <div className="form-error">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                        </svg>
+                                        <span>{error}</span>
                                     </div>
                                 )}
+
+                                <div className="form-grid">
+                                    <div className="form-group">
+                                        <label className="form-label">
+                                            Merk Motor <span className="required">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="Contoh: Honda, Yamaha, Suzuki"
+                                            value={formData.brand}
+                                            onChange={(e) => setFormData({...formData, brand: e.target.value})}
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">
+                                            Tipe Motor <span className="required">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="Contoh: Vario 125, NMAX, Satria"
+                                            value={formData.type}
+                                            onChange={(e) => setFormData({...formData, type: e.target.value})}
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">
+                                            Harga Sewa (Per Hari) <span className="required">*</span>
+                                        </label>
+                                        <div className="input-group">
+                                            <span className="input-prefix">Rp</span>
+                                            <input
+                                                type="number"
+                                                className="form-input"
+                                                placeholder="150000"
+                                                value={formData.price}
+                                                onChange={(e) => setFormData({...formData, price: e.target.value})}
+                                                min="0"
+                                                step="1000"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Status</label>
+                                        <select
+                                            className="form-select"
+                                            value={formData.status}
+                                            onChange={(e) => setFormData({...formData, status: e.target.value})}
+                                        >
+                                            <option value="available">Tersedia</option>
+                                            <option value="rented">Disewa</option>
+                                            <option value="maintenance">Maintenance</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="form-group form-group-full">
+                                        <label className="form-label">Spesifikasi</label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="Contoh: 125cc, Manual, Injeksi"
+                                            value={formData.specs}
+                                            onChange={(e) => setFormData({...formData, specs: e.target.value})}
+                                        />
+                                    </div>
+
+                                    <div className="form-group form-group-full">
+                                        <label className="form-label">Deskripsi</label>
+                                        <textarea
+                                            className="form-textarea"
+                                            placeholder="Deskripsi singkat tentang motor..."
+                                            value={formData.description}
+                                            onChange={(e) => setFormData({...formData, description: e.target.value})}
+                                            rows="3"
+                                        />
+                                    </div>
+
+                                    <div className="form-group form-group-full">
+                                        <label className="form-label">Foto Motor</label>
+                                        <div className="file-upload">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => setFormData({...formData, image: e.target.files[0]})}
+                                                id="motor-image"
+                                                className="file-input"
+                                            />
+                                            <label htmlFor="motor-image" className="file-label">
+                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                                    <polyline points="21,15 16,10 5,21"></polyline>
+                                                </svg>
+                                                <span>Pilih foto motor</span>
+                                            </label>
+                                            {formData.image && (
+                                                <div className="file-preview">
+                                                    <span className="file-name">{formData.image.name}</span>
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => setFormData({...formData, image: null})}
+                                                        className="file-remove"
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="modal-actions">
+                            <div className="modal-footer">
                                 <button 
                                     type="button" 
-                                    className="btn btn-cancel" 
+                                    className="btn-secondary"
                                     onClick={closeModal}
                                     disabled={submitLoading}
                                 >
@@ -714,10 +927,24 @@ const Motor = () => {
                                 </button>
                                 <button 
                                     type="submit" 
-                                    className="btn btn-primary"
+                                    className="btn-primary"
                                     disabled={submitLoading}
                                 >
-                                    {submitLoading ? 'Menyimpan...' : (modalMode === 'add' ? 'Tambah Motor' : 'Simpan Perubahan')}
+                                    {submitLoading ? (
+                                        <>
+                                            <div className="loading-spinner-sm"></div>
+                                            Menyimpan...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                                <polyline points="17,21 17,13 7,13 7,21"></polyline>
+                                                <polyline points="7,3 7,8 15,8"></polyline>
+                                            </svg>
+                                            {modalMode === 'add' ? 'Tambah Motor' : 'Simpan Perubahan'}
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </form>
@@ -727,5 +954,6 @@ const Motor = () => {
         </div>
     );
 };
+
 
 export default Motor;

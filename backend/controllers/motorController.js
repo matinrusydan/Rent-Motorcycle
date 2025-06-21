@@ -52,60 +52,30 @@ const getMotorById = async (req, res) => {
         console.error('Error in getMotorById:', error);
         res.status(500).json({
             success: false,
-            message: error.message
+            message: `Failed to retrieve motor: ${error.message}`
         });
     }
 };
 
 const createMotor = async (req, res) => {
     try {
+        // Asumsi `gambar_motor` adalah path file yang diupload oleh multer
         const motorData = {
-            brand: req.body.brand,
-            type: req.body.type,
-            harga_sewa: parseFloat(req.body.harga_sewa),
-            specs: req.body.specs,
-            status: req.body.status || 'available',
-            description: req.body.description,
-            gambar_motor: req.file ? req.file.path.replace(/\\/g, '/') : null
+            ...req.body,
+            gambar_motor: req.file ? req.file.path.replace(/\\/g, '/') : null // Ganti backslash dengan forward slash untuk konsistensi path URL
         };
 
-        // Validation
-        if (!motorData.brand || !motorData.type || !motorData.harga_sewa || !motorData.specs || !motorData.status) {
-            if (req.file) {
-                try {
-                    await fs.unlink(req.file.path);
-                } catch (err) {
-                    console.warn('Failed to delete uploaded file:', err);
-                }
-            }
-            return res.status(400).json({
-                success: false,
-                message: 'Brand, type, price, specs, and status are required.'
-            });
-        }
-
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: 'Motor image is required.'
-            });
-        }
-
         const newMotor = await Motor.create(motorData);
-
         res.status(201).json({
             success: true,
-            data: newMotor,
-            message: 'Motor created successfully.'
+            message: 'Motor created successfully',
+            data: newMotor
         });
     } catch (error) {
-        console.error('Error in createMotor:', error);
-        if (req.file) {
-            try {
-                await fs.unlink(req.file.path);
-            } catch (err) {
-                console.warn('Failed to delete uploaded file:', err);
-            }
+        console.error('Error creating motor:', error);
+        // Jika ada file yang diupload dan terjadi error, hapus file tersebut
+        if (req.file && fs.existsSync(req.file.path)) {
+            await fs.unlink(req.file.path);
         }
         res.status(500).json({
             success: false,
@@ -117,64 +87,46 @@ const createMotor = async (req, res) => {
 const updateMotor = async (req, res) => {
     try {
         const { id } = req.params;
-        
-        const motorData = {
-            brand: req.body.brand,
-            type: req.body.type,
-            harga_sewa: parseFloat(req.body.harga_sewa),
-            specs: req.body.specs,
-            status: req.body.status,
-            description: req.body.description,
-            gambar_motor: req.file ? req.file.path.replace(/\\/g, '/') : null
-        };
+        const motorData = { ...req.body };
+        let oldMotor = await Motor.getById(id); // Ambil data motor lama
 
-        let oldMotorImage = null;
+        if (!oldMotor) {
+            return res.status(404).json({ success: false, message: 'Motor not found.' });
+        }
+
         if (req.file) {
-            const oldMotor = await Motor.getById(id);
-            if (oldMotor) {
-                oldMotorImage = oldMotor.gambar_motor;
+            motorData.gambar_motor = req.file.path.replace(/\\/g, '/');
+            // Hapus gambar lama jika ada dan berbeda dengan yang baru
+            if (oldMotor.gambar_motor && oldMotor.gambar_motor !== motorData.gambar_motor) {
+                const oldImagePath = path.join(__dirname, '..', oldMotor.gambar_motor);
+                try {
+                    await fs.unlink(oldImagePath);
+                    console.log('Old image deleted:', oldImagePath);
+                } catch (unlinkError) {
+                    console.warn('Could not delete old image (might not exist):', oldImagePath, unlinkError.message);
+                }
             }
         }
 
         const updatedMotor = await Motor.update(id, motorData);
 
         if (!updatedMotor) {
-            if (req.file) {
-                try {
-                    await fs.unlink(req.file.path);
-                } catch (err) {
-                    console.warn('Failed to delete uploaded file:', err);
-                }
-            }
             return res.status(404).json({
                 success: false,
-                message: 'Motor not found.'
+                message: 'Motor not found or no changes made.'
             });
-        }
-
-        if (req.file && oldMotorImage) {
-            try {
-                const oldImagePath = path.join(__dirname, '..', oldMotorImage);
-                await fs.unlink(oldImagePath);
-                console.log(`Old image deleted: ${oldImagePath}`);
-            } catch (fileError) {
-                console.warn('Warning: Failed to delete old image:', fileError.message);
-            }
         }
 
         res.json({
             success: true,
-            data: updatedMotor,
-            message: 'Motor updated successfully.'
+            message: 'Motor updated successfully',
+            data: updatedMotor
         });
     } catch (error) {
-        console.error('Error in updateMotor:', error);
-        if (req.file) {
-            try {
-                await fs.unlink(req.file.path);
-            } catch (err) {
-                console.warn('Failed to delete uploaded file:', err);
-            }
+        console.error('Error updating motor:', error);
+        // Jika ada file baru diupload dan terjadi error update, hapus file baru tersebut
+        if (req.file && fs.existsSync(req.file.path)) {
+            await fs.unlink(req.file.path);
         }
         res.status(500).json({
             success: false,
@@ -186,33 +138,31 @@ const updateMotor = async (req, res) => {
 const deleteMotor = async (req, res) => {
     try {
         const { id } = req.params;
-        
-        const motor = await Motor.getById(id);
+        const motor = await Motor.getById(id); // Ambil data motor untuk mendapatkan path gambar
+
         if (!motor) {
-            return res.status(404).json({
-                success: false,
-                message: 'Motor not found.'
-            });
+            return res.status(404).json({ success: false, message: 'Motor not found.' });
         }
 
-        await Motor.delete(id);
+        const deleteResult = await Motor.delete(id);
 
+        // Hapus file gambar setelah motor dihapus dari database
         if (motor.gambar_motor) {
+            const imagePath = path.join(__dirname, '..', motor.gambar_motor);
             try {
-                const imagePath = path.join(__dirname, '..', motor.gambar_motor);
                 await fs.unlink(imagePath);
-                console.log(`Motor image deleted: ${imagePath}`);
-            } catch (fileError) {
-                console.warn('Warning: Failed to delete image file:', fileError.message);
+                console.log('Image deleted:', imagePath);
+            } catch (unlinkError) {
+                console.warn('Could not delete image file (might not exist):', imagePath, unlinkError.message);
             }
         }
 
         res.json({
             success: true,
-            message: 'Motor deleted successfully.'
+            message: deleteResult.message
         });
     } catch (error) {
-        console.error('Error in deleteMotor:', error);
+        console.error('Error deleting motor:', error);
         res.status(500).json({
             success: false,
             message: `Failed to delete motor: ${error.message}`
@@ -222,32 +172,36 @@ const deleteMotor = async (req, res) => {
 
 const bulkDeleteMotors = async (req, res) => {
     try {
-        const { ids } = req.body;
-
-        if (!ids || !Array.isArray(ids) || ids.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid motor IDs for deletion.'
-            });
+        const { ids } = req.body; // ids diharapkan berupa array ID motor
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ success: false, message: 'Invalid or empty array of IDs provided.' });
         }
 
-        const motorsToDelete = await Promise.all(ids.map(id => Motor.getById(id)));
-        const deletedCount = await Motor.bulkDelete(ids);
+        // Ambil path gambar untuk semua motor yang akan dihapus
+        const motorsToDelete = [];
+        for (const id of ids) {
+            const motor = await Motor.getById(id);
+            if (motor && motor.gambar_motor) {
+                motorsToDelete.push(motor.gambar_motor);
+            }
+        }
 
-        const imageCleanupPromises = motorsToDelete
-            .filter(motor => motor && motor.gambar_motor)
-            .map(motor => {
-                const imagePath = path.join(__dirname, '..', motor.gambar_motor);
-                return fs.unlink(imagePath)
-                    .catch(err => console.warn('Warning: Failed to delete image:', err.message));
-            });
+        const affectedRows = await Motor.bulkDelete(ids);
 
-        await Promise.all(imageCleanupPromises);
+        // Hapus file gambar yang terkait
+        for (const gambar_motor of motorsToDelete) {
+            const imagePath = path.join(__dirname, '..', gambar_motor);
+            try {
+                await fs.unlink(imagePath);
+                console.log('Bulk deleted image:', imagePath);
+            } catch (unlinkError) {
+                console.warn('Could not delete image file during bulk delete (might not exist):', imagePath, unlinkError.message);
+            }
+        }
 
         res.json({
             success: true,
-            message: `${deletedCount} motors deleted successfully.`,
-            deletedCount: deletedCount
+            message: `${affectedRows} motors deleted successfully.`
         });
     } catch (error) {
         console.error('Error in bulkDeleteMotors:', error);
@@ -261,7 +215,7 @@ const bulkDeleteMotors = async (req, res) => {
 const getMotorStats = async (req, res) => {
     try {
         const stats = await Motor.getStats();
-        
+
         res.json({
             success: true,
             data: stats,
@@ -282,7 +236,8 @@ const getAvailableMotors = async (req, res) => {
             status: 'available' // Hanya ambil yang tersedia
             // Filter lain seperti brand, search bisa ditambahkan dari req.query jika diperlukan
         };
-        const motors = await Motor.findAll(filters);
+        // *** PERBAIKAN DI SINI: Ubah Motor.findAll menjadi Motor.getAll ***
+        const motors = await Motor.getAll(filters); 
         res.json({ success: true, data: motors, message: 'Available motors retrieved successfully.' });
     } catch (error) {
         console.error('Error in getAvailableMotors:', error);
@@ -298,5 +253,5 @@ module.exports = {
     deleteMotor,
     bulkDeleteMotors,
     getMotorStats,
-    getAvailableMotors
+    getAvailableMotors // Pastikan ini diekspor
 };

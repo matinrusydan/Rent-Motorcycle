@@ -1,71 +1,20 @@
 // frontend/src/pages/admin/PembayaranAdmin.jsx
 
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import Header from '../../components/Header.jsx';
-import Footer from '../../components/Footer.jsx';
-import '../../assets/css/pembayaran.css'; // Menggunakan CSS pembayaran untuk styling utama
-import '../../assets/css/admin/dashboard.css'; // Atau CSS admin umum jika ada
-import '../../assets/css/global.css'; 
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import Sidebar from '../../components/admin/Sidebar.jsx';
+import Footer from '../../components/Footer.jsx'; // Sesuaikan path jika berbeda
+
+// CSS yang relevan (pastikan file-file ini ada dan berisi gaya yang dibutuhkan)
+import '../../assets/css/admin/dashboard.css';
+import '../../assets/css/admin/sidebar.css';
+import '../../assets/css/admin/pembayaranadmin.css';
+import '../../assets/css/global.css';
 
 const PembayaranAdmin = () => {
-    // State untuk data pembayaran (dummy data untuk simulasi)
-    const [pembayaranList, setPembayaranList] = useState([
-        {
-            id: 1,
-            nama: 'Budi Santoso',
-            motor: 'Honda Beat',
-            tanggalSewa: '2025-06-21',
-            lamaSewa: 3,
-            totalPembayaran: 240000,
-            statusPembayaran: 'pending',
-            buktiPembayaran: 'bukti_1.jpg',
-            tanggalUpload: '2025-06-20 14:30',
-            catatan: 'Sudah transfer via BCA',
-            noHp: '081234567890'
-        },
-        {
-            id: 2,
-            nama: 'Sari Melati',
-            motor: 'Yamaha NMAX',
-            tanggalSewa: '2025-06-22',
-            lamaSewa: 2,
-            totalPembayaran: 220000,
-            statusPembayaran: 'approved',
-            buktiPembayaran: 'bukti_2.jpg',
-            tanggalUpload: '2025-06-19 16:45',
-            catatan: '',
-            noHp: '085678901234'
-        },
-        {
-            id: 3,
-            nama: 'Ahmad Rizki',
-            motor: 'Honda PCX',
-            tanggalSewa: '2025-06-23',
-            lamaSewa: 1,
-            totalPembayaran: 120000,
-            statusPembayaran: 'rejected',
-            buktiPembayaran: 'bukti_3.jpg',
-            tanggalUpload: '2025-06-20 09:15',
-            catatan: 'Bukti tidak jelas',
-            noHp: '087654321098'
-        },
-        {
-            id: 4,
-            nama: 'Rina Handayani',
-            motor: 'Suzuki Address',
-            tanggalSewa: '2025-06-24',
-            lamaSewa: 5,
-            totalPembayaran: 425000,
-            statusPembayaran: 'pending',
-            buktiPembayaran: 'bukti_4.pdf',
-            tanggalUpload: '2025-06-20 11:20',
-            catatan: 'Transfer dari rekening berbeda',
-            noHp: '089876543210'
-        }
-    ]);
-
-    // State untuk filter dan pencarian
+    const [pembayaranList, setPembayaranList] = useState([]); // Hapus dummy data, inisialisasi kosong
+    const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedPembayaran, setSelectedPembayaran] = useState(null);
@@ -73,61 +22,147 @@ const PembayaranAdmin = () => {
     const [confirmationPopupOpen, setConfirmationPopupOpen] = useState(false);
     const [actionType, setActionType] = useState(''); // 'approve' atau 'reject'
     const [rejectReason, setRejectReason] = useState('');
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-    // Fungsi untuk memfilter data pembayaran
+    const navigate = useNavigate();
+
+    const getApiUrl = () => {
+        return import.meta.env.VITE_APP_API_URL || 'http://localhost:5000';
+    };
+
+    // === START: Fungsionalitas SIDEBAR (Disalin dari ReservasiAdmin.jsx) ===
+    const [isSidebarToggled, setIsSidebarToggled] = useState(false);
+
+    useEffect(() => {
+        if (isSidebarToggled) {
+            document.body.classList.add('sidebar-toggled');
+        } else {
+            document.body.classList.remove('sidebar-toggled');
+        }
+        const handleResize = () => {
+            if (window.innerWidth < 768) setIsSidebarToggled(true);
+            else setIsSidebarToggled(false);
+        };
+        window.addEventListener('resize', handleResize);
+        handleResize(); // Panggil saat komponen dimuat
+        return () => {
+            window.removeEventListener('resize', handleResize);
+        };
+    }, [isSidebarToggled]);
+
+
+    // === START: FUNGSI UNTUK MENGAMBIL DATA PEMBAYARAN DARI BACKEND ===
+    const fetchPayments = useCallback(async () => {
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('Sesi Anda berakhir, silakan login kembali.');
+                navigate('/login');
+                setLoading(false);
+                return;
+            }
+
+            // Panggil API untuk mendapatkan semua pembayaran
+            const response = await axios.get(`${getApiUrl()}/api/payments`, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                },
+                timeout: 15000 // Timeout 15 detik
+            });
+            setPembayaranList(response.data.data);
+        } catch (error) {
+            console.error('Error fetching payments:', error);
+            const errorMessage = error.response?.data?.message || error.message || 'Terjadi kesalahan tidak dikenal.';
+            alert(`Gagal memuat data pembayaran: ${errorMessage}. Pastikan Anda login sebagai admin.`);
+            if (error.response?.status === 401 || error.response?.status === 403) {
+                navigate('/login');
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, [navigate]);
+
+    useEffect(() => {
+        fetchPayments();
+    }, [refreshTrigger, fetchPayments]); // refreshTrigger dan fetchPayments sebagai dependency
+    // === END: FUNGSI UNTUK MENGAMBIL DATA PEMBAYARAN DARI BACKEND ===
+
+
+    // Fungsi untuk memfilter data pembayaran di frontend
     const filteredPembayaran = pembayaranList.filter(item => {
-        const matchesStatus = filterStatus === 'all' || item.statusPembayaran === filterStatus;
-        const matchesSearch = item.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                             item.motor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                             item.noHp.includes(searchTerm);
-        return matchesStatus && matchesSearch;
+        // Asumsi item.status_pembayaran dari backend akan selalu ada dan string
+        const matchesStatus = filterStatus === 'all' || (item.status_pembayaran?.toLowerCase() === filterStatus.toLowerCase());
+        // Asumsi item.user_nama_lengkap, item.motor_brand, item.motor_type, item.user_no_hp dari backend
+        const matchesSearch = (item.user_nama_lengkap?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                             (item.motor_brand?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                             (item.motor_type?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                             (item.user_no_hp || '').includes(searchTerm);
+        return matchesSearch && matchesStatus;
     });
 
     // Fungsi untuk mendapatkan badge status
     const getStatusBadge = (status) => {
+        // Menggunakan toLowerCase() untuk memastikan case-insensitivity
+        const lowerStatus = status?.toLowerCase();
         const badges = {
             pending: { text: 'Menunggu', class: 'status-pending', icon: '⏳' },
-            approved: { text: 'Disetujui', class: 'status-approved', icon: '✅' },
+            verified: { text: 'Diverifikasi', class: 'status-verified', icon: '✅' }, // Mengubah ke 'verified'
             rejected: { text: 'Ditolak', class: 'status-rejected', icon: '❌' }
         };
-        return badges[status] || badges.pending;
+        return badges[lowerStatus] || badges.pending;
     };
 
     // Fungsi untuk format currency
     const formatCurrency = (amount) => {
-        return `Rp ${amount.toLocaleString('id-ID')}`;
+        // Memastikan input adalah angka dan menanganinya jika NaN
+        const numAmount = parseFloat(amount);
+        return isNaN(numAmount) ? 'Rp 0' : `Rp ${numAmount.toLocaleString('id-ID')}`;
     };
 
     // Fungsi untuk format tanggal
     const formatDate = (dateString) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('id-ID', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-        });
+        if (!dateString) return '-';
+        try {
+            // New Date() bisa menerima string tanggal ISO 8601 atau timestamp
+            const date = new Date(dateString);
+            // Cek apakah tanggal valid
+            if (isNaN(date.getTime())) {
+                throw new Error("Invalid Date");
+            }
+            return date.toLocaleDateString('id-ID', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        } catch (e) {
+            console.error("Invalid date string for formatDate:", dateString, e);
+            // Kembalikan string asli atau placeholder jika tanggal tidak valid
+            return dateString;
+        }
     };
 
-    // Fungsi untuk membuka detail pembayaran
+    // Fungsi untuk membuka detail pembayaran popup
     const openDetailPopup = (pembayaran) => {
         setSelectedPembayaran(pembayaran);
         setDetailPopupOpen(true);
-        document.body.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden'; // Nonaktifkan scroll body
     };
 
-    // Fungsi untuk menutup detail popup
+    // Fungsi untuk menutup detail pembayaran popup
     const closeDetailPopup = () => {
         setDetailPopupOpen(false);
         setSelectedPembayaran(null);
-        document.body.style.overflow = 'auto';
+        document.body.style.overflow = 'auto'; // Aktifkan kembali scroll body
     };
 
-    // Fungsi untuk membuka confirmation popup
+    // Fungsi untuk membuka confirmation popup (approve/reject)
     const openConfirmationPopup = (pembayaran, action) => {
         setSelectedPembayaran(pembayaran);
         setActionType(action);
         setConfirmationPopupOpen(true);
-        setRejectReason('');
+        // Mengisi alasan penolakan dengan catatan admin yang sudah ada jika action adalah reject
+        setRejectReason(pembayaran.admin_notes || '');
         document.body.style.overflow = 'hidden';
     };
 
@@ -140,8 +175,8 @@ const PembayaranAdmin = () => {
         document.body.style.overflow = 'auto';
     };
 
-    // Fungsi untuk menghandle approval/rejection
-    const handleStatusChange = () => {
+    // === FUNGSI UNTUK MENGUBAH STATUS PEMBAYARAN (REAL BACKEND CALL) ===
+    const handleStatusChange = async () => {
         if (!selectedPembayaran) return;
 
         if (actionType === 'reject' && !rejectReason.trim()) {
@@ -149,232 +184,287 @@ const PembayaranAdmin = () => {
             return;
         }
 
-        // Update status pembayaran
-        const updatedList = pembayaranList.map(item => {
-            if (item.id === selectedPembayaran.id) {
-                return {
-                    ...item,
-                    statusPembayaran: actionType === 'approve' ? 'approved' : 'rejected',
-                    catatan: actionType === 'reject' ? rejectReason : item.catatan
-                };
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('Sesi Anda berakhir, silakan login kembali.');
+                navigate('/login');
+                return;
             }
-            return item;
-        });
 
-        setPembayaranList(updatedList);
-        
-        // Simulasi kirim notifikasi ke customer
-        const statusText = actionType === 'approve' ? 'disetujui' : 'ditolak';
-        alert(`Pembayaran ${selectedPembayaran.nama} berhasil ${statusText}!`);
-        
-        closeConfirmationPopup();
+            // Status yang akan dikirim ke backend
+            const newStatus = actionType === 'approve' ? 'verified' : 'rejected';
+            // Catatan admin hanya relevan untuk penolakan
+            const adminNotes = actionType === 'reject' ? rejectReason.trim() : null;
+
+            // Panggil API PUT untuk mengubah status pembayaran
+            const response = await axios.put(`${getApiUrl()}/api/payments/${selectedPembayaran.id}/status`,
+                { status: newStatus, admin_notes: adminNotes }, // Kirim admin_notes ke backend
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            alert(response.data.message);
+            closeConfirmationPopup();
+            setRefreshTrigger(prev => prev + 1); // Memicu pengambilan ulang data
+        } catch (error) {
+            console.error('Error changing payment status:', error);
+            const errorMessage = error.response?.data?.message || error.message || 'Terjadi kesalahan tidak dikenal.';
+            alert(`Gagal mengubah status pembayaran: ${errorMessage}.`);
+        }
     };
+    // === AKHIR FUNGSI MENGUBAH STATUS PEMBAYARAN ===
+
 
     // Fungsi untuk menghubungi customer via WhatsApp
     const contactCustomer = (pembayaran) => {
+        // Menggunakan properti dari objek pembayaran yang diterima dari backend
         const message = encodeURIComponent(
-            `Halo ${pembayaran.nama}, kami menghubungi Anda terkait pembayaran rental motor ${pembayaran.motor} pada tanggal ${formatDate(pembayaran.tanggalSewa)}. Terima kasih.`
+            `Halo ${pembayaran.user_nama_lengkap}, kami menghubungi Anda terkait pembayaran rental motor ${pembayaran.motor_brand} ${pembayaran.motor_type} pada tanggal ${formatDate(pembayaran.reservasi_tanggal_mulai)}. Total pembayaran Anda: ${formatCurrency(pembayaran.jumlah_pembayaran)}. Terima kasih.`
         );
-        const waUrl = `https://wa.me/${pembayaran.noHp}?text=${message}`;
+        const waUrl = `https://wa.me/${pembayaran.user_no_hp}?text=${message}`;
         window.open(waUrl, '_blank');
     };
 
-    // Fungsi untuk download bukti pembayaran (simulasi)
-    const downloadBukti = (fileName) => {
-        // Simulasi download - di aplikasi nyata akan fetch file dari server
-        alert(`Downloading: ${fileName}`);
+    // Fungsi untuk download bukti pembayaran
+    const downloadBukti = (filePath) => {
+        if (!filePath) {
+            alert('Jalur file bukti pembayaran tidak tersedia.');
+            return;
+        }
+        // Asumsi filePath dari backend adalah 'uploads\pembayaran\nama_file.jpg' atau 'uploads/pembayaran/nama_file.jpg'
+        // Kita perlu mendapatkan hanya nama file dari path lengkap
+        const fileName = filePath.split(/[\\/]/).pop(); // Memisahkan berdasarkan '/' atau '\'
+        const fileUrl = `${getApiUrl()}/uploads/pembayaran/${fileName}`; // Path yang dapat diakses publik di server
+
+        window.open(fileUrl, '_blank'); // Buka di tab baru
     };
 
+    // JSX untuk tampilan loading
+    if (loading) {
+        return (
+            <div id="wrapper" className={isSidebarToggled ? 'sidebar-toggled' : ''}>
+                <Sidebar />
+                <div id="content-wrapper" className="d-flex flex-column">
+                    <div id="content">
+                        <div className="loading-container">
+                            <div className="loading-spinner">⏳</div>
+                            <p>Memuat data pembayaran...</p>
+                        </div>
+                    </div>
+                    {/* Footer juga di sini untuk tampilan loading */}
+                    <Footer />
+                </div>
+            </div>
+        );
+    }
+
+    // JSX untuk tampilan utama setelah loading
     return (
-        <>
-            <Header />
+        <div id="wrapper" className={isSidebarToggled ? 'sidebar-toggled' : ''}>
+            <Sidebar />
 
-            {/* Main Content */}
-            <main className="main-content">
-                <div className="container">
-                    <div className="pembayaran-wrapper">
-                        
-                        {/* Header Admin */}
-                        <div className="page-header">
-                            <div className="header-icon">👤</div>
-                            <h1 className="page-title">Admin - Kelola Pembayaran</h1>
-                            <p className="page-subtitle">Verifikasi dan kelola pembayaran dari pelanggan</p>
-                        </div>
+            <div id="content-wrapper" className="d-flex flex-column">
+                <div id="content">
+                    <div className="container-fluid">
+                        <div className="pembayaran-wrapper">
 
-                        {/* Filter dan Search */}
-                        <div className="card">
-                            <div className="card-content">
-                                <div className="admin-controls">
-                                    <div className="search-group">
-                                        <input
-                                            type="text"
-                                            placeholder="Cari nama, motor, atau nomor HP..."
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                            className="search-input"
-                                        />
+                            {/* Header Admin */}
+                            <div className="page-header">
+                                <div className="header-icon">👤</div>
+                                <h1 className="page-title">Admin - Kelola Pembayaran</h1>
+                                <p className="page-subtitle">Verifikasi dan kelola pembayaran dari pelanggan</p>
+                            </div>
+
+                            {/* Filter dan Search */}
+                            <div className="card shadow mb-4">
+                                <div className="card-body">
+                                    <div className="admin-controls">
+                                        <div className="search-group">
+                                            <input
+                                                type="text"
+                                                placeholder="Cari nama, motor, atau nomor HP..."
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="form-control"
+                                            />
+                                        </div>
+                                        <div className="filter-group">
+                                            <select
+                                                value={filterStatus}
+                                                onChange={(e) => setFilterStatus(e.target.value)}
+                                                className="form-select"
+                                            >
+                                                <option value="all">Semua Status</option>
+                                                <option value="pending">Menunggu</option>
+                                                <option value="verified">Diverifikasi</option>
+                                                <option value="rejected">Ditolak</option>
+                                            </select>
+                                        </div>
                                     </div>
-                                    <div className="filter-group">
-                                        <select
-                                            value={filterStatus}
-                                            onChange={(e) => setFilterStatus(e.target.value)}
-                                            className="filter-select"
-                                        >
-                                            <option value="all">Semua Status</option>
-                                            <option value="pending">Menunggu</option>
-                                            <option value="approved">Disetujui</option>
-                                            <option value="rejected">Ditolak</option>
-                                        </select>
+                                </div>
+                            </div>
+
+                            {/* Statistik */}
+                            <div className="stats-grid">
+                                <div className="stat-card">
+                                    <div className="stat-icon">⏳</div>
+                                    <div className="stat-info">
+                                        <div className="stat-number">{pembayaranList.filter(p => p.status_pembayaran === 'pending').length}</div>
+                                        <div className="stat-label">Menunggu</div>
+                                    </div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-icon">✅</div>
+                                    <div className="stat-info">
+                                        <div className="stat-number">{pembayaranList.filter(p => p.status_pembayaran === 'verified').length}</div>
+                                        <div className="stat-label">Diverifikasi</div>
+                                    </div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-icon">❌</div>
+                                    <div className="stat-info">
+                                        <div className="stat-number">{pembayaranList.filter(p => p.status_pembayaran === 'rejected').length}</div>
+                                        <div className="stat-label">Ditolak</div>
+                                    </div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-icon">💰</div>
+                                    <div className="stat-info">
+                                        <div className="stat-number">
+                                            {formatCurrency(pembayaranList.filter(p => p.status_pembayaran === 'verified').reduce((sum, p) => sum + parseFloat(p.jumlah_pembayaran), 0))}
+                                        </div>
+                                        <div className="stat-label">Total Diterima</div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Statistik */}
-                        <div className="stats-grid">
-                            <div className="stat-card">
-                                <div className="stat-icon">⏳</div>
-                                <div className="stat-info">
-                                    <div className="stat-number">{pembayaranList.filter(p => p.statusPembayaran === 'pending').length}</div>
-                                    <div className="stat-label">Menunggu</div>
-                                </div>
-                            </div>
-                            <div className="stat-card">
-                                <div className="stat-icon">✅</div>
-                                <div className="stat-info">
-                                    <div className="stat-number">{pembayaranList.filter(p => p.statusPembayaran === 'approved').length}</div>
-                                    <div className="stat-label">Disetujui</div>
-                                </div>
-                            </div>
-                            <div className="stat-card">
-                                <div className="stat-icon">❌</div>
-                                <div className="stat-info">
-                                    <div className="stat-number">{pembayaranList.filter(p => p.statusPembayaran === 'rejected').length}</div>
-                                    <div className="stat-label">Ditolak</div>
-                                </div>
-                            </div>
-                            <div className="stat-card">
-                                <div className="stat-icon">💰</div>
-                                <div className="stat-info">
-                                    <div className="stat-number">
-                                        {formatCurrency(pembayaranList.filter(p => p.statusPembayaran === 'approved').reduce((sum, p) => sum + p.totalPembayaran, 0))}
+                            {/* Tabel Pembayaran */}
+                            <div className="card shadow mb-4">
+                                <div className="card-header py-3">
+                                    <h6 className="m-0 font-weight-bold text-primary">Daftar Pembayaran</h6>
+                                    <div className="card-subtitle">
+                                        Menampilkan {filteredPembayaran.length} dari {pembayaranList.length} pembayaran
                                     </div>
-                                    <div className="stat-label">Total Diterima</div>
                                 </div>
-                            </div>
-                        </div>
-
-                        {/* Tabel Pembayaran */}
-                        <div className="card">
-                            <div className="card-header">
-                                <h2 className="card-title">📋 Daftar Pembayaran</h2>
-                                <div className="card-subtitle">
-                                    Menampilkan {filteredPembayaran.length} dari {pembayaranList.length} pembayaran
-                                </div>
-                            </div>
-                            <div className="card-content">
-                                <div className="table-responsive">
-                                    <table className="pembayaran-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Customer</th>
-                                                <th>Motor</th>
-                                                <th>Tanggal Sewa</th>
-                                                <th>Total</th>
-                                                <th>Status</th>
-                                                <th>Upload</th>
-                                                <th>Aksi</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {filteredPembayaran.map(pembayaran => {
-                                                const statusBadge = getStatusBadge(pembayaran.statusPembayaran);
-                                                return (
-                                                    <tr key={pembayaran.id}>
-                                                        <td>
-                                                            <div className="customer-info">
-                                                                <div className="customer-name">{pembayaran.nama}</div>
-                                                                <div className="customer-phone">{pembayaran.noHp}</div>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div className="motor-info">
-                                                                <div className="motor-name">{pembayaran.motor}</div>
-                                                                <div className="motor-duration">{pembayaran.lamaSewa} hari</div>
-                                                            </div>
-                                                        </td>
-                                                        <td>{formatDate(pembayaran.tanggalSewa)}</td>
-                                                        <td className="amount">{formatCurrency(pembayaran.totalPembayaran)}</td>
-                                                        <td>
-                                                            <span className={`status-badge ${statusBadge.class}`}>
-                                                                {statusBadge.icon} {statusBadge.text}
-                                                            </span>
-                                                        </td>
-                                                        <td>{pembayaran.tanggalUpload}</td>
-                                                        <td>
-                                                            <div className="action-buttons">
-                                                                <button
-                                                                    onClick={() => openDetailPopup(pembayaran)}
-                                                                    className="btn-action btn-detail"
-                                                                    title="Lihat Detail"
-                                                                >
-                                                                    👁️
-                                                                </button>
-                                                                {pembayaran.statusPembayaran === 'pending' && (
-                                                                    <>
+                                <div className="card-body">
+                                    <div className="table-responsive">
+                                        <table className="table table-bordered" width="100%" cellSpacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Customer</th>
+                                                    <th>Motor</th>
+                                                    <th>Tanggal Sewa</th>
+                                                    <th>Total</th>
+                                                    <th>Status</th>
+                                                    <th>Upload</th>
+                                                    <th>Aksi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {filteredPembayaran.length > 0 ? (
+                                                    filteredPembayaran.map(pembayaran => {
+                                                        const statusBadge = getStatusBadge(pembayaran.status_pembayaran);
+                                                        return (
+                                                            <tr key={pembayaran.id}>
+                                                                <td>
+                                                                    <div className="customer-info">
+                                                                        <div className="customer-name">{pembayaran.user_nama_lengkap}</div>
+                                                                        <div className="customer-phone">{pembayaran.user_no_hp}</div>
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    <div className="motor-info">
+                                                                        <div className="motor-name">{pembayaran.motor_brand} {pembayaran.motor_type}</div>
+                                                                        <div className="motor-duration">{pembayaran.lama_sewa} hari</div>
+                                                                    </div>
+                                                                </td>
+                                                                <td>{formatDate(pembayaran.reservasi_tanggal_mulai)}</td>
+                                                                <td className="amount">{formatCurrency(pembayaran.jumlah_pembayaran)}</td>
+                                                                <td>
+                                                                    <span className={`badge ${statusBadge.class}`}>
+                                                                        {statusBadge.icon} {statusBadge.text}
+                                                                    </span>
+                                                                </td>
+                                                                <td>{formatDate(pembayaran.tanggal_pembayaran)}</td>
+                                                                <td>
+                                                                    <div className="d-flex flex-column">
                                                                         <button
-                                                                            onClick={() => openConfirmationPopup(pembayaran, 'approve')}
-                                                                            className="btn-action btn-approve"
-                                                                            title="Setujui"
+                                                                            onClick={() => openDetailPopup(pembayaran)}
+                                                                            className="btn btn-info btn-sm mb-1"
+                                                                            title="Lihat Detail"
                                                                         >
-                                                                            ✅
+                                                                            👁️ Detail
                                                                         </button>
+                                                                        {pembayaran.status_pembayaran === 'pending' && (
+                                                                            <>
+                                                                                <button
+                                                                                    onClick={() => openConfirmationPopup(pembayaran, 'approve')}
+                                                                                    className="btn btn-success btn-sm mb-1"
+                                                                                    title="Setujui"
+                                                                                >
+                                                                                    ✅ Setujui
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => openConfirmationPopup(pembayaran, 'reject')}
+                                                                                    className="btn btn-danger btn-sm mb-1"
+                                                                                    title="Tolak"
+                                                                                >
+                                                                                    ❌ Tolak
+                                                                                </button>
+                                                                            </>
+                                                                        )}
                                                                         <button
-                                                                            onClick={() => openConfirmationPopup(pembayaran, 'reject')}
-                                                                            className="btn-action btn-reject"
-                                                                            title="Tolak"
+                                                                            onClick={() => contactCustomer(pembayaran)}
+                                                                            className="btn btn-warning btn-sm"
+                                                                            title="Hubungi via WhatsApp"
                                                                         >
-                                                                            ❌
+                                                                            💬 Hubungi
                                                                         </button>
-                                                                    </>
-                                                                )}
-                                                                <button
-                                                                    onClick={() => contactCustomer(pembayaran)}
-                                                                    className="btn-action btn-contact"
-                                                                    title="Hubungi via WhatsApp"
-                                                                >
-                                                                    💬
-                                                                </button>
-                                                            </div>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })
+                                                ) : (
+                                                    <tr>
+                                                        <td colSpan="7" className="text-center">
+                                                            {loading ? 'Memuat data...' : 'Tidak ada data pembayaran.'}
                                                         </td>
                                                     </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                
-                                {filteredPembayaran.length === 0 && (
-                                    <div className="empty-state">
-                                        <div className="empty-icon">📭</div>
-                                        <h3>Tidak ada data pembayaran</h3>
-                                        <p>Belum ada pembayaran yang sesuai dengan filter yang dipilih.</p>
+                                                )}
+                                            </tbody>
+                                        </table>
                                     </div>
-                                )}
+
+                                    {filteredPembayaran.length === 0 && !loading && (
+                                        <div className="empty-state">
+                                            <div className="empty-icon">📭</div>
+                                            <h3>Tidak ada data pembayaran</h3>
+                                            <p>Belum ada pembayaran yang sesuai dengan filter yang dipilih.</p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </main>
 
-            <Footer />
+                {/* Footer Admin */}
+                <footer className="sticky-footer bg-white">
+                    <div className="container my-auto">
+                        <div className="copyright text-center my-auto">
+                            <span>Copyright &copy; Motor Rental 2024</span>
+                        </div>
+                    </div>
+                </footer>
+            </div>
 
             {/* Detail Popup */}
             {detailPopupOpen && selectedPembayaran && (
                 <div className="popup-overlay active">
                     <div className="popup-content large">
                         <div className="popup-header">
-                            <h3>Detail Pembayaran - {selectedPembayaran.nama}</h3>
+                            <h3>Detail Pembayaran - {selectedPembayaran.user_nama_lengkap}</h3>
                             <button className="close-btn" onClick={closeDetailPopup}>&times;</button>
                         </div>
                         <div className="popup-body">
@@ -382,59 +472,81 @@ const PembayaranAdmin = () => {
                                 <div className="detail-section">
                                     <h4>📋 Informasi Reservasi</h4>
                                     <div className="detail-item">
+                                        <label>ID Reservasi:</label>
+                                        <span>{selectedPembayaran.reservasi_id}</span>
+                                    </div>
+                                    <div className="detail-item">
                                         <label>Nama Lengkap:</label>
-                                        <span>{selectedPembayaran.nama}</span>
+                                        <span>{selectedPembayaran.user_nama_lengkap}</span>
                                     </div>
                                     <div className="detail-item">
                                         <label>No. HP:</label>
-                                        <span>{selectedPembayaran.noHp}</span>
+                                        <span>{selectedPembayaran.user_no_hp}</span>
                                     </div>
                                     <div className="detail-item">
                                         <label>Motor:</label>
-                                        <span>{selectedPembayaran.motor}</span>
+                                        <span>{selectedPembayaran.motor_brand} {selectedPembayaran.motor_type}</span>
                                     </div>
                                     <div className="detail-item">
                                         <label>Tanggal Sewa:</label>
-                                        <span>{formatDate(selectedPembayaran.tanggalSewa)}</span>
+                                        <span>{formatDate(selectedPembayaran.reservasi_tanggal_mulai)}</span>
                                     </div>
                                     <div className="detail-item">
                                         <label>Lama Sewa:</label>
-                                        <span>{selectedPembayaran.lamaSewa} hari</span>
+                                        <span>{selectedPembayaran.lama_sewa} hari</span>
                                     </div>
                                     <div className="detail-item">
-                                        <label>Total Pembayaran:</label>
-                                        <span className="amount">{formatCurrency(selectedPembayaran.totalPembayaran)}</span>
+                                        <label>Total Reservasi:</label>
+                                        <span className="amount">{formatCurrency(selectedPembayaran.reservasi_total_harga)}</span>
                                     </div>
                                 </div>
                                 
                                 <div className="detail-section">
                                     <h4>💳 Informasi Pembayaran</h4>
                                     <div className="detail-item">
-                                        <label>Status:</label>
-                                        <span className={`status-badge ${getStatusBadge(selectedPembayaran.statusPembayaran).class}`}>
-                                            {getStatusBadge(selectedPembayaran.statusPembayaran).icon} {getStatusBadge(selectedPembayaran.statusPembayaran).text}
+                                        <label>ID Pembayaran:</label>
+                                        <span>{selectedPembayaran.id}</span>
+                                    </div>
+                                    <div className="detail-item">
+                                        <label>Jumlah Pembayaran:</label>
+                                        <span className="amount">{formatCurrency(selectedPembayaran.jumlah_pembayaran)}</span>
+                                    </div>
+                                    <div className="detail-item">
+                                        <label>Status Pembayaran:</label>
+                                        <span className={`badge ${getStatusBadge(selectedPembayaran.status_pembayaran).class}`}>
+                                            {getStatusBadge(selectedPembayaran.status_pembayaran).icon} {getStatusBadge(selectedPembayaran.status_pembayaran).text}
                                         </span>
                                     </div>
                                     <div className="detail-item">
-                                        <label>Tanggal Upload:</label>
-                                        <span>{selectedPembayaran.tanggalUpload}</span>
+                                        <label>Tanggal Pembayaran:</label>
+                                        <span>{formatDate(selectedPembayaran.tanggal_pembayaran)}</span>
+                                    </div>
+                                    <div className="detail-item">
+                                        <label>Metode Pembayaran:</label>
+                                        <span>{selectedPembayaran.metode_pembayaran}</span>
                                     </div>
                                     <div className="detail-item">
                                         <label>Bukti Pembayaran:</label>
                                         <div className="bukti-actions">
-                                            <span>{selectedPembayaran.buktiPembayaran}</span>
+                                            <span>{selectedPembayaran.bukti_transfer.split('/').pop() || 'N/A'}</span>
                                             <button 
-                                                onClick={() => downloadBukti(selectedPembayaran.buktiPembayaran)}
+                                                onClick={() => downloadBukti(selectedPembayaran.bukti_transfer)}
                                                 className="btn-download"
                                             >
                                                 📥 Download
                                             </button>
                                         </div>
                                     </div>
-                                    {selectedPembayaran.catatan && (
+                                    {selectedPembayaran.catatan_pembeli && (
                                         <div className="detail-item">
-                                            <label>Catatan:</label>
-                                            <span>{selectedPembayaran.catatan}</span>
+                                            <label>Catatan Pembeli:</label>
+                                            <span>{selectedPembayaran.catatan_pembeli}</span>
+                                        </div>
+                                    )}
+                                    {selectedPembayaran.admin_notes && (
+                                        <div className="detail-item">
+                                            <label>Catatan Admin:</label>
+                                            <span>{selectedPembayaran.admin_notes}</span>
                                         </div>
                                     )}
                                 </div>
@@ -471,9 +583,9 @@ const PembayaranAdmin = () => {
                                     Apakah Anda yakin ingin {actionType === 'approve' ? 'menyetujui' : 'menolak'} pembayaran dari:
                                 </p>
                                 <div className="customer-summary">
-                                    <strong>{selectedPembayaran.nama}</strong><br/>
-                                    {selectedPembayaran.motor}<br/>
-                                    {formatCurrency(selectedPembayaran.totalPembayaran)}
+                                    <strong>{selectedPembayaran.user_nama_lengkap}</strong><br/>
+                                    {selectedPembayaran.motor_brand} {selectedPembayaran.motor_type}<br/>
+                                    {formatCurrency(selectedPembayaran.jumlah_pembayaran)}
                                 </div>
                                 
                                 {actionType === 'reject' && (
@@ -484,7 +596,7 @@ const PembayaranAdmin = () => {
                                             onChange={(e) => setRejectReason(e.target.value)}
                                             placeholder="Masukkan alasan penolakan..."
                                             rows="3"
-                                            className="form-textarea"
+                                            className="form-control"
                                             required
                                         />
                                     </div>
@@ -505,286 +617,7 @@ const PembayaranAdmin = () => {
                     </div>
                 </div>
             )}
-
-            <style jsx>{`
-                .admin-controls {
-                    display: flex;
-                    gap: 1rem;
-                    align-items: center;
-                    flex-wrap: wrap;
-                }
-
-                .search-group {
-                    flex: 1;
-                    min-width: 250px;
-                }
-
-                .search-input {
-                    width: 100%;
-                    padding: 0.75rem 1rem;
-                    border: 2px solid var(--gray-300);
-                    border-radius: 8px;
-                    font-size: 1rem;
-                }
-
-                .filter-group {
-                    min-width: 150px;
-                }
-
-                .filter-select {
-                    width: 100%;
-                    padding: 0.75rem 1rem;
-                    border: 2px solid var(--gray-300);
-                    border-radius: 8px;
-                    font-size: 1rem;
-                    background: white;
-                }
-
-                .stats-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                    gap: 1rem;
-                    margin-bottom: 2rem;
-                }
-
-                .stat-card {
-                    background: white;
-                    padding: 1.5rem;
-                    border-radius: 12px;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                    display: flex;
-                    align-items: center;
-                    gap: 1rem;
-                }
-
-                .stat-icon {
-                    font-size: 2rem;
-                    background: var(--primary-light);
-                    padding: 0.5rem;
-                    border-radius: 8px;
-                }
-
-                .stat-number {
-                    font-size: 1.5rem;
-                    font-weight: bold;
-                    color: var(--primary-color);
-                }
-
-                .stat-label {
-                    color: var(--gray-600);
-                    font-size: 0.9rem;
-                }
-
-                .table-responsive {
-                    overflow-x: auto;
-                }
-
-                .pembayaran-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-top: 1rem;
-                }
-
-                .pembayaran-table th,
-                .pembayaran-table td {
-                    padding: 1rem;
-                    text-align: left;
-                    border-bottom: 1px solid var(--gray-200);
-                }
-
-                .pembayaran-table th {
-                    background: var(--gray-50);
-                    font-weight: 600;
-                    color: var(--gray-700);
-                }
-
-                .customer-info, .motor-info {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.25rem;
-                }
-
-                .customer-name, .motor-name {
-                    font-weight: 600;
-                }
-
-                .customer-phone, .motor-duration {
-                    font-size: 0.9rem;
-                    color: var(--gray-600);
-                }
-
-                .amount {
-                    font-weight: 600;
-                    color: var(--success-color);
-                }
-
-                .status-badge {
-                    padding: 0.5rem 1rem;
-                    border-radius: 20px;
-                    font-size: 0.9rem;
-                    font-weight: 600;
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                }
-
-                .status-pending {
-                    background: #fff3cd;
-                    color: #856404;
-                }
-
-                .status-approved {
-                    background: #d1edff;
-                    color: #0c5460;
-                }
-
-                .status-rejected {
-                    background: #f8d7da;
-                    color: #721c24;
-                }
-
-                .action-buttons {
-                    display: flex;
-                    gap: 0.5rem;
-                }
-
-                .btn-action {
-                    padding: 0.5rem;
-                    border: none;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    font-size: 1rem;
-                    transition: all 0.3s ease;
-                }
-
-                .btn-detail {
-                    background: var(--gray-100);
-                    color: var(--gray-700);
-                }
-
-                .btn-approve {
-                    background: #d1edff;
-                    color: #0c5460;
-                }
-
-                .btn-reject {
-                    background: #f8d7da;
-                    color: #721c24;
-                }
-
-                .btn-contact {
-                    background: #d4edda;
-                    color: #155724;
-                }
-
-                .btn-action:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                }
-
-                .empty-state {
-                    text-align: center;
-                    padding: 3rem;
-                    color: var(--gray-600);
-                }
-
-                .empty-icon {
-                    font-size: 4rem;
-                    margin-bottom: 1rem;
-                }
-
-                .popup-content.large {
-                    max-width: 800px;
-                    width: 90vw;
-                }
-
-                .detail-grid {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 2rem;
-                }
-
-                .detail-section h4 {
-                    margin-bottom: 1rem;
-                    color: var(--primary-color);
-                    border-bottom: 2px solid var(--primary-light);
-                    padding-bottom: 0.5rem;
-                }
-
-                .detail-item {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    padding: 0.75rem 0;
-                    border-bottom: 1px solid var(--gray-100);
-                }
-
-                .detail-item label {
-                    font-weight: 600;
-                    color: var(--gray-700);
-                    flex-shrink: 0;
-                    margin-right: 1rem;
-                }
-
-                .bukti-actions {
-                    display: flex;
-                    align-items: center;
-                    gap: 1rem;
-                }
-
-                .btn-download {
-                    padding: 0.5rem 1rem;
-                    background: var(--primary-color);
-                    color: white;
-                    border: none;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    font-size: 0.9rem;
-                }
-
-                .confirmation-content p {
-                    margin-bottom: 1rem;
-                }
-
-                .customer-summary {
-                    background: var(--gray-50);
-                    padding: 1rem;
-                    border-radius: 8px;
-                    margin: 1rem 0;
-                    text-align: center;
-                }
-
-                .btn-success {
-                    background: var(--success-color);
-                    color: white;
-                }
-
-                .btn-danger {
-                    background: var(--danger-color);
-                    color: white;
-                }
-
-                @media (max-width: 768px) {
-                    .detail-grid {
-                        grid-template-columns: 1fr;
-                        gap: 1rem;
-                    }
-                    
-                    .admin-controls {
-                        flex-direction: column;
-                    }
-                    
-                    .search-group, .filter-group {
-                        width: 100%;
-                        min-width: auto;
-                    }
-
-                    .stats-grid {
-                        grid-template-columns: repeat(2, 1fr);
-                    }
-                }
-            `}</style>
-        </>
+        </div>
     );
 };
 

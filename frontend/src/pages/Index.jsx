@@ -3,13 +3,13 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import Header from '../components/Header.jsx'; 
+import Header from '../components/Header.jsx';
 import Footer from '../components/Footer.jsx';
-import MotorCard from '../components/MotorCard.jsx'; 
+import MotorCard from '../components/MotorCard.jsx';
 
 // CSS yang relevan
-import '../assets/css/style.css'; 
-import '../assets/css/global.css'; 
+import '../assets/css/style.css';
+import '../assets/css/global.css';
 
 // Component untuk menampilkan testimoni
 const TestimonialItem = ({ avatarInitials, name, rating, date, text }) => {
@@ -31,14 +31,15 @@ const TestimonialItem = ({ avatarInitials, name, rating, date, text }) => {
 const Index = () => {
     // State untuk data dinamis
     const [allMotors, setAllMotors] = useState([]); // Semua motor dari backend
-    const [filteredDisplayMotors, setFilteredDisplayMotors] = useState([]); // Motor yang ditampilkan setelah filter
     const [motorBrands, setMotorBrands] = useState([]); // Merk motor unik untuk filter
     const [allTestimonials, setAllTestimonials] = useState([]); // Semua testimoni dari backend
-    
+    const [showAllBrands, setShowAllBrands] = useState(false); // State untuk show/hide brands
+    const [brandSliders, setBrandSliders] = useState({}); // State untuk tracking slider per brand
+
     // State untuk UI feedback
     const [loadingMotors, setLoadingMotors] = useState(true);
     const [loadingTestimonials, setLoadingTestimonials] = useState(true);
-    const [error, setError] = useState(null); // General error for fetches
+    const [error, setError] = useState(null);
     const [submitReservationLoading, setSubmitReservationLoading] = useState(false);
     const [submitTestimonialLoading, setSubmitTestimonialLoading] = useState(false);
 
@@ -53,23 +54,76 @@ const Index = () => {
     const [rating, setRating] = useState(0);
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
-    // Refs untuk slider (tetap dipertahankan jika ingin slider, namun rendering motor akan disederhanakan)
-    const hondaSliderRef = useRef(null);
-    const yamahaSliderRef = useRef(null);
-    const suzukiSliderRef = useRef(null);
-    // State untuk melacak slide saat ini (jika masih menggunakan slider statis)
-    const sliders = useRef({
-        hondaSlider: { currentSlide: 0, totalSlides: 3, slidesPerPage: 3 },
-        yamahaSlider: { currentSlide: 0, totalSlides: 3, slidesPerPage: 3 },
-        suzukiSlider: { currentSlide: 0, totalSlides: 3, slidesPerPage: 3 }
-    });
+    // State untuk data user yang login
+    const [currentUser, setCurrentUser] = useState(null);
 
-    const navigate = useNavigate(); // Inisialisasi useNavigate
+    const navigate = useNavigate();
 
-    // Get API URL (konsisten dengan file frontend lainnya)
+    // Get API URL
     const getApiUrl = () => {
         return import.meta.env.VITE_APP_API_URL || 'http://localhost:5000';
     };
+
+
+    const debugUserData = () => {
+        const userStr = localStorage.getItem('user');
+        console.log('=== DEBUG USER DATA ===');
+        console.log('Raw localStorage user:', userStr);
+
+        if (userStr) {
+            try {
+                const user = JSON.parse(userStr);
+                console.log('Parsed user object:', user);
+                console.log('All user keys:', Object.keys(user));
+
+                // Check various possible field names
+                console.log('user.no_hp:', user.no_hp);
+                console.log('user.phone:', user.phone);
+                console.log('user.phone_number:', user.phone_number);
+                console.log('user.nomor_hp:', user.nomor_hp);
+                console.log('user.nama_lengkap:', user.nama_lengkap);
+                console.log('user.name:', user.name);
+                console.log('user.full_name:', user.full_name);
+
+            } catch (e) {
+                console.error('Error parsing user data:', e);
+            }
+        }
+    };
+
+    // Get current user data from localStorage
+    const getCurrentUser = useCallback(() => {
+        try {
+            const userStr = localStorage.getItem('user');
+            console.log('Raw user data from localStorage:', userStr);
+
+            if (!userStr) {
+                console.log('No user data found in localStorage');
+                return null;
+            }
+
+            const user = JSON.parse(userStr);
+            console.log('Parsed user data:', user);
+
+            // Debug: call the debug function
+            debugUserData();
+
+            // Normalize user data to ensure consistent field names
+            const normalizedUser = {
+                ...user,
+                // Make sure we have the correct field names
+                nama_lengkap: user.nama_lengkap || user.name || user.full_name || '',
+                no_hp: user.no_hp || user.phone || user.phone_number || user.nomor_hp || ''
+            };
+
+            console.log('Normalized user data:', normalizedUser);
+            setCurrentUser(normalizedUser);
+            return normalizedUser;
+        } catch (error) {
+            console.error('Error parsing user data:', error);
+            return null;
+        }
+    }, []);
 
     // --- FUNGSI PENGAMBILAN DATA DARI BACKEND ---
 
@@ -77,44 +131,43 @@ const Index = () => {
     const fetchPublicMotors = useCallback(async () => {
         setLoadingMotors(true);
         try {
-            // ✅ Endpoint baru untuk motor publik (perlu dibuat di backend)
-            const response = await axios.get(`${getApiUrl()}/api/motors/available`); 
+            const response = await axios.get(`${getApiUrl()}/api/motors/available`);
             const motors = response.data.data;
             setAllMotors(motors);
 
             // Ekstrak merk unik untuk filter
             const brands = [...new Set(motors.map(m => m.brand))];
-            setMotorBrands(['all', ...brands.filter(b => b)]); // Tambahkan 'all' dan hapus null/undefined
-            
-            // Inisialisasi motor yang ditampilkan (misal, semua Honda, Yamaha, Suzuki di grid terpisah)
-            // Atau, kita bisa menampilkan semua dalam satu grid responsif sederhana jika slider dihilangkan.
-            // Untuk demo ini, kita akan mengisi motorData untuk slider dengan data dari API
-            // Ini akan membutuhkan penyesuaian jika ingin slider benar-benar dinamis per brand
-            const groupedMotors = {};
+            setMotorBrands(brands.filter(b => b));
+
+            // Initialize slider states for each brand
+            const sliderStates = {};
             brands.forEach(brand => {
-                groupedMotors[brand] = motors.filter(m => m.brand === brand);
+                const brandMotors = motors.filter(m => m.brand === brand && m.status === 'available');
+                const totalSlides = Math.ceil(brandMotors.length / 3); // 3 cards per slide
+                sliderStates[brand] = {
+                    currentSlide: 0,
+                    totalSlides: Math.max(1, totalSlides),
+                    motorsPerSlide: 3
+                };
             });
-            // Untuk sementara, jika tetap pakai slider statis, motorData perlu diisi ulang
-            // setFilteredDisplayMotors(motors); // Atau tampilkan semua di satu grid
+            setBrandSliders(sliderStates);
 
         } catch (err) {
             console.error('Error fetching public motors:', err);
             setError(`Gagal memuat daftar motor: ${err.message}`);
             setAllMotors([]);
-            setFilteredDisplayMotors([]);
             setMotorBrands([]);
         } finally {
             setLoadingMotors(false);
         }
-    }, []); // Dependensi kosong agar hanya berjalan sekali saat mount
+    }, []);
 
     // Mengambil semua testimoni yang disetujui untuk publik
     const fetchPublicTestimonials = useCallback(async () => {
         setLoadingTestimonials(true);
         try {
-            // ✅ Endpoint baru untuk testimoni publik (perlu dibuat di backend)
             const response = await axios.get(`${getApiUrl()}/api/testimonials/approved`);
-            setAllTestimonials(response.data.data); // Asumsi data testimoni ada di response.data.data
+            setAllTestimonials(response.data.data);
         } catch (err) {
             console.error('Error fetching public testimonials:', err);
             setError(`Gagal memuat testimoni: ${err.message}`);
@@ -122,208 +175,335 @@ const Index = () => {
         } finally {
             setLoadingTestimonials(false);
         }
-    }, []); // Dependensi kosong agar hanya berjalan sekali saat mount
+    }, []);
 
+
+    const fetchUserProfile = useCallback(async () => {
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) return null;
+
+        // Try to fetch complete user profile from backend
+        const response = await axios.get(`${getApiUrl()}/api/user/profile`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        console.log('User profile from API:', response.data);
+
+        const userData = response.data.data || response.data.user || response.data;
+
+        // Update localStorage with complete user data
+        localStorage.setItem('user', JSON.stringify(userData));
+        setCurrentUser(userData);
+
+        return userData;
+    } catch (error) {
+        console.error('Error fetching user profile:', error);
+        return getCurrentUser(); // fallback to localStorage data
+    }
+}, [getCurrentUser]);
     // --- USEEFFECTS UNTUK LOADING DATA ---
     useEffect(() => {
         fetchPublicMotors();
         fetchPublicTestimonials();
-    }, [fetchPublicMotors, fetchPublicTestimonials]); // Panggil fetch saat fungsi berubah (hanya sekali)
 
-
-    // --- LOGIKA SLIDER (Adaptasi dari JS statis, masih semi-statis untuk merek) ---
-    // Efek untuk inisialisasi slider dan set min date pada mount komponen
-    useEffect(() => {
-        // Ini masih akan berjalan dengan asumsi slider DOM ada dan elemennya statis
-        Object.keys(sliders.current).forEach(sliderId => {
-            createDots(sliderId);
-            updateSlider(sliderId);
+        // Try to get fresh user data from API first, then fallback to localStorage
+        fetchUserProfile().then(user => {
+            if (!user) {
+                getCurrentUser();
+            }
         });
+    }, [fetchPublicMotors, fetchPublicTestimonials, fetchUserProfile, getCurrentUser]);
 
-        const dateInput = document.getElementById('tanggalSewa');
-        if (dateInput) {
-            const today = new Date();
-            const minDate = today.toISOString().split('T')[0];
-            dateInput.min = minDate;
-        }
-    }, []);
-
-    // Fungsi untuk membuat indikator titik slider
-    const createDots = (sliderId) => {
-        const dotsContainer = document.getElementById(sliderId.replace('Slider', 'Dots'));
-        if (!dotsContainer) return;
-
-        const totalSlides = sliders.current[sliderId].totalSlides;
-        dotsContainer.innerHTML = ''; 
-        for (let i = 0; i < totalSlides; i++) {
-            const dot = document.createElement('div');
-            dot.className = 'slider-dot';
-            dot.onclick = () => goToSlide(sliderId, i);
-            dotsContainer.appendChild(dot);
-        }
+    // --- SLIDER FUNCTIONS ---
+    const nextSlide = (brand) => {
+        setBrandSliders(prev => {
+            const current = prev[brand];
+            if (current && current.currentSlide < current.totalSlides - 1) {
+                return {
+                    ...prev,
+                    [brand]: {
+                        ...current,
+                        currentSlide: current.currentSlide + 1
+                    }
+                };
+            }
+            return prev;
+        });
     };
 
-    // Fungsi untuk memperbarui posisi slider dan status titik
-    const updateSlider = (sliderId) => {
-        const slider = document.getElementById(sliderId); // Akses DOM langsung
-        if (!slider) return;
-
-        const currentSlide = sliders.current[sliderId].currentSlide;
-        // Total slides bisa dihitung dinamis jika ada motor per brand
-        const totalSlides = sliders.current[sliderId].totalSlides; 
-        
-        slider.style.transform = `translateX(-${currentSlide * 100}%)`;
-        
-        const dotsContainer = document.getElementById(sliderId.replace('Slider', 'Dots'));
-        if (dotsContainer) {
-            const dots = dotsContainer.querySelectorAll('.slider-dot');
-            dots.forEach((dot, index) => {
-                dot.classList.toggle('active', index === currentSlide);
-            });
-        }
-        
-        const prevBtn = document.getElementById(sliderId.replace('Slider', 'Prev'));
-        const nextBtn = document.getElementById(sliderId.replace('Slider', 'Next'));
-        
-        if (prevBtn) prevBtn.disabled = currentSlide === 0;
-        if (nextBtn) nextBtn.disabled = currentSlide === totalSlides - 1;
+    const prevSlide = (brand) => {
+        setBrandSliders(prev => {
+            const current = prev[brand];
+            if (current && current.currentSlide > 0) {
+                return {
+                    ...prev,
+                    [brand]: {
+                        ...current,
+                        currentSlide: current.currentSlide - 1
+                    }
+                };
+            }
+            return prev;
+        });
     };
 
-    const nextSlide = (sliderId) => {
-        const current = sliders.current[sliderId];
-        if (current.currentSlide < current.totalSlides - 1) {
-            current.currentSlide++;
-            updateSlider(sliderId);
-        }
+    const goToSlide = (brand, slideIndex) => {
+        setBrandSliders(prev => ({
+            ...prev,
+            [brand]: {
+                ...prev[brand],
+                currentSlide: slideIndex
+            }
+        }));
     };
 
-    const previousSlide = (sliderId) => {
-        const current = sliders.current[sliderId];
-        if (current.currentSlide > 0) {
-            current.currentSlide--;
-            updateSlider(sliderId);
-        }
+    // Get motors for specific brand and slide
+    const getMotorsForBrandSlide = (brand, slideIndex) => {
+        const brandMotors = allMotors.filter(m => m.brand === brand && m.status === 'available');
+        const startIndex = slideIndex * 3;
+        const endIndex = startIndex + 3;
+        return brandMotors.slice(startIndex, endIndex);
     };
-
-    const goToSlide = (sliderId, slideIndex) => {
-        sliders.current[sliderId].currentSlide = slideIndex;
-        updateSlider(sliderId);
-    };
-    // --- AKHIR LOGIKA SLIDER ---
-
 
     // --- FUNGSI FORM RESERVASI ---
-    // Fungsi untuk membuka popup reservasi
     const openReservasiPopup = useCallback((merk = '', tipe = '') => {
+        // Refresh user data sebelum membuka popup
+        const user = getCurrentUser();
+        if (!user) {
+            alert('Anda harus login untuk membuat reservasi.');
+            navigate('/login');
+            return;
+        }
+
         setReservasiPopupOpen(true);
-        document.body.style.overflow = 'hidden'; 
+        document.body.style.overflow = 'hidden';
         setSelectedMerk(merk);
-        // Isi tipe motor berdasarkan merk yang dipilih dari data dinamis
         const motorOfType = allMotors.filter(m => m.brand === merk);
         const uniqueTypes = [...new Set(motorOfType.map(m => m.type))];
         setAvailableTipeMotor(uniqueTypes.filter(t => t));
         setCurrentTipeMotor(tipe);
-    }, [allMotors]); // allMotors sebagai dependensi
+    }, [allMotors, getCurrentUser, navigate]);
 
-    // Fungsi untuk menutup popup reservasi
     const closeReservasiPopup = () => {
         setReservasiPopupOpen(false);
-        document.body.style.overflow = 'auto'; 
-        // Reset form state
+        document.body.style.overflow = 'auto';
         setSelectedMerk('');
         setAvailableTipeMotor([]);
         setCurrentTipeMotor('');
-        // document.getElementById('reservasiForm').reset(); // Hanya jika form tidak dikontrol sepenuhnya oleh state
     };
 
-    // Handler untuk perubahan merk motor di form reservasi
+
     const handleMerkChange = (e) => {
         const merk = e.target.value;
         setSelectedMerk(merk);
         const motorOfType = allMotors.filter(m => m.brand === merk);
         const uniqueTypes = [...new Set(motorOfType.map(m => m.type))];
         setAvailableTipeMotor(uniqueTypes.filter(t => t));
-        setCurrentTipeMotor(''); 
+        setCurrentTipeMotor('');
     };
 
-    // Handler untuk submit form reservasi
-    const handleReservasiSubmit = async (e) => {
-        e.preventDefault();
-        setSubmitReservationLoading(true);
-        setError(null);
+// Fixed handleReservasiSubmit function
+const handleReservasiSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitReservationLoading(true);
+    setError(null);
 
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData.entries());
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData.entries());
 
-        // Validasi frontend
-        if (!data.merkMotor || !data.tipeMotor || !data.namaLengkap || !data.noHp || !data.tanggalSewa || !data.lamaSewa) {
-            setError('Mohon lengkapi semua field yang diperlukan untuk reservasi!');
+    // Debug logging yang lebih detail
+    console.log('=== DEBUG RESERVATION ===');
+    console.log('Form data:', data);
+    console.log('Current user:', currentUser);
+    console.log('All motors:', allMotors);
+
+    // FIX: Get nama lengkap and no HP from hidden fields or currentUser
+    const namaLengkap = data.namaLengkapHidden || currentUser?.nama_lengkap;
+    const noHp = data.noHpHidden || currentUser?.no_hp;
+
+    // Validate required form fields
+    if (!data.merkMotor || !data.tipeMotor || !data.tanggalSewa || !data.lama_sewa || !data.lokasi_jemput) {
+        setError('Mohon lengkapi semua field yang diperlukan untuk reservasi!');
+        setSubmitReservationLoading(false);
+        return;
+    }
+
+    // FIX: Validate user profile data from hidden fields or currentUser state
+    const userId = currentUser?.id;
+    if (!namaLengkap || !noHp || !userId) {
+        let profileError = 'Data profil Anda tidak lengkap.';
+        if (!namaLengkap) profileError += ' (Nama Lengkap missing)';
+        if (!noHp) profileError += ' (Nomor HP missing)';
+        if (!userId) profileError += ' (User ID missing, please re-login or check your profile)';
+        setError(profileError + ' Silakan lengkapi profil Anda terlebih dahulu.');
+        setSubmitReservationLoading(false);
+        navigate('/login'); // Redirect to login or profile update page
+        return;
+    }
+
+    // FIX: Validate numeric fields before proceeding
+    const lamaSewa = parseInt(data.lama_sewa);
+    if (isNaN(lamaSewa) || lamaSewa <= 0) {
+        setError('Lama sewa harus berupa angka yang valid (minimal 1 hari).');
+        setSubmitReservationLoading(false);
+        return;
+    }
+
+    try {
+        const selectedMotor = allMotors.find(m => m.brand === data.merkMotor && m.type === data.tipeMotor);
+        console.log('Selected motor:', selectedMotor);
+
+        if (!selectedMotor) {
+            setError('Motor tidak ditemukan. Silakan pilih motor yang tersedia.');
             setSubmitReservationLoading(false);
             return;
         }
-        const phonePattern = /^[0-9]{10,13}$/;
-        if (!phonePattern.test(data.noHp.replace(/[^0-9]/g, ''))) {
-            setError('Nomor HP tidak valid! Masukkan 10-13 digit angka.');
+
+        const token = localStorage.getItem('token');
+        // const userId = currentUser?.id; // Already defined and validated above
+
+        console.log('Token:', token ? 'Available' : 'Not found');
+        console.log('User ID (after validation):', userId);
+        console.log('Nama Lengkap:', namaLengkap);
+        console.log('No HP:', noHp);
+
+        if (!token) { // userId is already checked above
+            alert('Anda harus login untuk membuat reservasi.');
+            navigate('/login');
             setSubmitReservationLoading(false);
             return;
         }
 
-        try {
-            // Temukan motor_id berdasarkan merk dan tipe yang dipilih
-            const selectedMotor = allMotors.find(m => m.brand === data.merkMotor && m.type === data.tipeMotor);
-            if (!selectedMotor) {
-                setError('Motor tidak ditemukan. Silakan pilih motor yang tersedia.');
-                setSubmitReservationLoading(false);
-                return;
-            }
-
-            const token = localStorage.getItem('token'); // Asumsi user sudah login
-            const userId = JSON.parse(localStorage.getItem('user'))?.id;
-
-            if (!token || !userId) {
-                alert('Anda harus login untuk membuat reservasi.');
-                navigate('/login');
-                setSubmitReservationLoading(false);
-                return;
-            }
-
-            // Hitung total harga (bisa juga dihitung di backend)
-            const calculatedTotalHarga = parseFloat(selectedMotor.harga_sewa) * parseInt(data.lamaSewa);
-
-            // ✅ Endpoint baru untuk membuat reservasi (perlu dibuat di backend)
-            const response = await axios.post(`${getApiUrl()}/api/reservations`, {
-                user_id: userId,
-                motor_id: selectedMotor.id,
-                tanggal_sewa: data.tanggalSewa,
-                lama_sewa_hari: parseInt(data.lamaSewa),
-                total_harga: calculatedTotalHarga,
-                catatan: data.catatanReservasi || null // Tambahkan field catatan di form jika perlu
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            alert(response.data.message || 'Reservasi berhasil dibuat! Akan dialihkan ke halaman pembayaran.');
-            navigate('/pembayaran', { state: { reservationId: response.data.reservationId, totalHarga: calculatedTotalHarga } }); // Redirect ke pembayaran
-        } catch (err) {
-            console.error('Error submitting reservation:', err);
-            setError(`Gagal membuat reservasi: ${err.response?.data?.message || err.message}`);
-        } finally {
+        // FIX: Validate user ID is a valid number
+        const userIdNumber = parseInt(userId);
+        if (isNaN(userIdNumber)) {
+            setError('ID pengguna tidak valid. Silakan login ulang.');
             setSubmitReservationLoading(false);
+            return;
         }
-    };
 
+        // FIX: Validate motor ID is a valid number
+        const motorIdNumber = parseInt(selectedMotor.id);
+        if (isNaN(motorIdNumber)) {
+            setError('ID motor tidak valid. Silakan pilih motor yang lain.');
+            setSubmitReservationLoading(false);
+            return;
+        }
+
+        // FIX: Validate and parse motor price properly
+        const motorPrice = selectedMotor.price || selectedMotor.harga_sewa || selectedMotor.harga;
+        const motorPriceNumber = parseFloat(motorPrice);
+
+        console.log('Motor price raw:', motorPrice);
+        console.log('Motor price parsed:', motorPriceNumber);
+
+        if (isNaN(motorPriceNumber) || motorPriceNumber <= 0) {
+            setError('Harga motor tidak valid. Silakan pilih motor lain atau hubungi admin.');
+            setSubmitReservationLoading(false);
+            return;
+        }
+
+        // FIX: Calculate total price with proper validation
+        const calculatedTotalHarga = motorPriceNumber * lamaSewa;
+        console.log('Calculated total harga:', calculatedTotalHarga);
+
+        if (isNaN(calculatedTotalHarga) || calculatedTotalHarga <= 0) {
+            setError('Total harga tidak dapat dihitung. Silakan periksa data motor dan lama sewa.');
+            setSubmitReservationLoading(false);
+            return;
+        }
+
+        // FIX: Validate date format
+        const tanggalMulai = new Date(data.tanggalSewa);
+        if (isNaN(tanggalMulai.getTime())) {
+            setError('Tanggal sewa tidak valid. Silakan pilih tanggal yang benar.');
+            setSubmitReservationLoading(false);
+            return;
+        }
+
+        // Calculate end date
+        const tanggalSelesai = new Date(tanggalMulai);
+        tanggalSelesai.setDate(tanggalSelesai.getDate() + lamaSewa);
+
+        // FIX: Create payload with validated data
+        const payload = {
+            user_id: userIdNumber,
+            motor_id: motorIdNumber,
+            tanggal_mulai: data.tanggalSewa, // Format:YYYY-MM-DD
+            tanggal_selesai: tanggalSelesai.toISOString().split('T')[0], // Format:YYYY-MM-DD
+            lama_sewa: lamaSewa,
+            lokasi_jemput: data.lokasi_jemput.trim(),
+            total_harga: calculatedTotalHarga,
+            catatan: data.catatanReservasi?.trim() || null
+        };
+
+        console.log('Final payload to send:', payload);
+
+        // FIX: Validate all payload fields before sending
+        if (isNaN(payload.user_id) || isNaN(payload.motor_id) || isNaN(payload.lama_sewa) || isNaN(payload.total_harga)) {
+            setError('Ada data yang tidak valid. Silakan periksa kembali form reservasi.');
+            setSubmitReservationLoading(false);
+            return;
+        }
+
+        console.log('API URL:', `${getApiUrl()}/api/reservations`);
+
+        const response = await axios.post(`${getApiUrl()}/api/reservations`, payload, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log('Success response:', response.data);
+        alert(response.data.message || 'Reservasi berhasil dibuat!');
+        closeReservasiPopup();
+
+        // Handle different response structures
+        const reservationId = response.data.reservationId || response.data.data?.id || response.data.id;
+        navigate('/pembayaran', {
+            state: {
+                reservationId: reservationId,
+                totalHarga: calculatedTotalHarga
+            }
+        });
+
+    } catch (err) {
+        console.error('=== ERROR DETAILS ===');
+        console.error('Full error object:', err);
+        console.error('Error message:', err.message);
+        console.error('Error response status:', err.response?.status);
+        console.error('Error response data:', err.response?.data);
+        console.error('Error response headers:', err.response?.headers);
+        console.error('Request config:', err.config);
+
+        // Show detailed error message
+        let errorMessage = 'Gagal membuat reservasi: ';
+        if (err.response?.data?.message) {
+            errorMessage += err.response.data.message;
+        } else if (err.response?.data?.error) {
+            errorMessage += err.response.data.error;
+        } else if (err.response?.data) {
+            errorMessage += JSON.stringify(err.response.data);
+        } else {
+            errorMessage += err.message;
+        }
+
+        setError(errorMessage);
+    } finally {
+        setSubmitReservationLoading(false);
+    }
+};
     // --- FUNGSI FORM TESTIMONI ---
-    // Handler untuk perubahan input testimoni
     const handleCommentChange = (e) => {
         setCommentText(e.target.value);
     };
 
-    // Handler untuk perubahan rating testimoni
     const handleRatingChange = (e) => {
         setRating(parseInt(e.target.value));
     };
 
-    // Handler untuk submit testimoni
     const handleSubmitTestimonial = async () => {
         setSubmitTestimonialLoading(true);
         setError(null);
@@ -335,7 +515,7 @@ const Index = () => {
         }
 
         const token = localStorage.getItem('token');
-        const userId = JSON.parse(localStorage.getItem('user'))?.id;
+        const userId = currentUser?.id;
 
         if (!token || !userId) {
             alert('Anda harus login untuk mengirim testimoni.');
@@ -345,7 +525,6 @@ const Index = () => {
         }
 
         try {
-            // ✅ Endpoint baru untuk mengirim testimoni (perlu dibuat di backend)
             const response = await axios.post(`${getApiUrl()}/api/testimonials`, {
                 user_id: userId,
                 content: commentText,
@@ -355,11 +534,10 @@ const Index = () => {
             });
 
             alert(response.data.message || 'Testimoni berhasil dikirim!');
-            setShowSuccessMessage(true); // Tampilkan pesan sukses frontend
-            setCommentText(''); // Reset form
+            setShowSuccessMessage(true);
+            setCommentText('');
             setRating(0);
-            document.querySelectorAll('input[name="rating"]').forEach(radio => radio.checked = false); // Reset radio
-            // Perlu trigger fetchPublicTestimonials jika ingin melihat yang baru (setelah disetujui admin)
+            document.querySelectorAll('input[name="rating"]').forEach(radio => radio.checked = false);
         } catch (err) {
             console.error('Error submitting testimonial:', err);
             setError(`Gagal mengirim testimoni: ${err.response?.data?.message || err.message}`);
@@ -368,21 +546,19 @@ const Index = () => {
         }
     };
 
-    // Fungsi untuk mereset form testimoni
     const resetTestimonialForm = () => {
         setCommentText('');
         setRating(0);
         setShowSuccessMessage(false);
-        // document.querySelectorAll('input[name="rating"]').forEach(radio => radio.checked = false);
     };
 
     // --- FUNGSI UTILITY ---
-    // Get unique brands from motorData for filter options
     const getUniqueBrands = useCallback(() => {
         const brands = [...new Set(allMotors.map(motor => motor.brand))];
         return brands.filter(brand => brand);
     }, [allMotors]);
 
+    // Fix: Use correct field name 'price' from database
     const formatPrice = (price) => {
         return `Rp ${parseFloat(price).toLocaleString('id-ID')}/hari`;
     };
@@ -395,7 +571,11 @@ const Index = () => {
         });
     };
 
-    // Logika loading secara keseluruhan
+    // Get displayed brands (first 3 or all if showAllBrands is true)
+    const getDisplayedBrands = () => {
+        return showAllBrands ? motorBrands : motorBrands.slice(0, 3);
+    };
+
     if (loadingMotors || loadingTestimonials) {
         return (
             <>
@@ -411,7 +591,7 @@ const Index = () => {
 
     return (
         <>
-            <Header /> 
+            <Header />
 
             {/* Hero Section */}
             <section id="beranda" className="hero">
@@ -419,7 +599,6 @@ const Index = () => {
                     <div className="hero-content">
                         <h1>Sewa Motor Mudah & Terpercaya</h1>
                         <p>Nikmati perjalanan Anda dengan koleksi motor berkualitas dan pelayanan terbaik. Proses cepat, harga terjangkau!</p>
-                        {/* ✅ openReservasiPopup akan mengisi merk/tipe */}
                         <button className="btn-primary" onClick={() => openReservasiPopup()}>Reservasi Sekarang</button>
                     </div>
                     <div className="hero-image">
@@ -440,27 +619,93 @@ const Index = () => {
                                 <button className="error-close" onClick={() => setError(null)}>✖️</button>
                             </div>
                         )}
-                        {/* Rendering Motor dari data dinamis */}
-                        {motorBrands.filter(brand => brand !== 'all').map(brand => (
-                            <div className="category" key={brand}>
-                                <h3>{brand}</h3>
-                                {/* Untuk saat ini, kita akan menampilkan semua motor dari brand ini dalam satu grid sederhana */}
-                                <div className="motor-grid">
-                                    {allMotors.filter(m => m.brand === brand && m.status === 'available').map(motor => (
-                                        <MotorCard 
-                                            key={motor.id}
-                                            brand={motor.brand} 
-                                            type={motor.type} 
-                                            price={formatPrice(motor.harga_sewa)}
-                                            specs={motor.specs} 
-                                            openReservasiPopup={() => openReservasiPopup(motor.brand, motor.type)} 
-                                        />
-                                    ))}
+
+                        {/* Render motor brands with slider functionality */}
+                        {getDisplayedBrands().map(brand => {
+                            const brandMotors = allMotors.filter(m => m.brand === brand && m.status === 'available');
+                            const sliderState = brandSliders[brand];
+
+                            if (brandMotors.length === 0) return null;
+
+                            return (
+                                <div className="category" key={brand}>
+                                    <h3>{brand}</h3>
+                                    <div className="motor-slider-container">
+                                        <div className="motor-slider-wrapper">
+                                            <div
+                                                className="motor-slider"
+                                                style={{
+                                                    transform: `translateX(-${(sliderState?.currentSlide || 0) * 100}%)`,
+                                                    transition: 'transform 0.3s ease'
+                                                }}
+                                            >
+                                                {Array.from({ length: sliderState?.totalSlides || 1 }, (_, slideIndex) => (
+                                                    <div key={slideIndex} className="motor-slide">
+                                                        <div className="motor-grid">
+                                                            {getMotorsForBrandSlide(brand, slideIndex).map(motor => (
+                                                                <MotorCard
+                                                                    key={motor.id}
+                                                                    brand={motor.brand}
+                                                                    type={motor.type}
+                                                                    price={formatPrice(motor.price)} // Fix: use motor.price
+                                                                    specs={motor.specs}
+                                                                    openReservasiPopup={() => openReservasiPopup(motor.brand, motor.type)}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Slider Controls */}
+                                        {sliderState && sliderState.totalSlides > 1 && (
+                                            <>
+                                                <button
+                                                    className="slider-btn prev-btn"
+                                                    onClick={() => prevSlide(brand)}
+                                                    disabled={sliderState.currentSlide === 0}
+                                                >
+                                                    ❮
+                                                </button>
+                                                <button
+                                                    className="slider-btn next-btn"
+                                                    onClick={() => nextSlide(brand)}
+                                                    disabled={sliderState.currentSlide === sliderState.totalSlides - 1}
+                                                >
+                                                    ❯
+                                                </button>
+
+                                                {/* Dots indicator */}
+                                                <div className="slider-dots">
+                                                    {Array.from({ length: sliderState.totalSlides }, (_, index) => (
+                                                        <button
+                                                            key={index}
+                                                            className={`slider-dot ${index === sliderState.currentSlide ? 'active' : ''}`}
+                                                            onClick={() => goToSlide(brand, index)}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
-                                {/* Slider controls if still needed, but logic would need major refactor for dynamic data */}
-                                {/* Untuk demo, kita abaikan slider controller di sini jika rendering dinamis */}
+                            );
+                        })}
+
+                        {/* Show More/Less Button */}
+                        {motorBrands.length > 3 && (
+                            <div className="show-more-container">
+                                <button
+                                    className="btn-show-more"
+                                    onClick={() => setShowAllBrands(!showAllBrands)}
+                                >
+                                    {showAllBrands ? 'Tampilkan Lebih Sedikit' : 'Tampilkan Lebih Banyak'}
+                                    <span className="dropdown-icon">{showAllBrands ? '▲' : '▼'}</span>
+                                </button>
                             </div>
-                        ))}
+                        )}
+
                         {allMotors.length === 0 && !loadingMotors && (
                             <div className="empty-state">
                                 <div className="empty-icon">🏍️</div>
@@ -477,9 +722,8 @@ const Index = () => {
                 <div className="container">
                     <h2>Bagikan Pengalaman Anda</h2>
                     <p className="section-subtitle">Ceritakan pengalaman Anda menggunakan layanan rental motor kami</p>
-                    
-                    {/* Error alert for testimonial form */}
-                    {error && submitTestimonialLoading && ( // Only show if error came from testimonial submit
+
+                    {error && submitTestimonialLoading && (
                          <div className="error-alert">
                             <span className="error-icon">⚠️</span>
                             {error}
@@ -490,14 +734,15 @@ const Index = () => {
                     {!showSuccessMessage ? (
                         <div className="comment-form-wrapper" id="commentForm">
                             <div className="user-info">
-                                {/* Asumsi info user diambil dari localStorage jika sudah login */}
-                                <div className="user-avatar">US</div>
+                                <div className="user-avatar">
+                                    {currentUser?.name ? currentUser.name.split(' ').map(n => n[0]).join('') : 'US'}
+                                </div>
                                 <div className="user-details">
-                                    <h4>Nama Pengguna</h4>
-                                    <p>email@example.com</p>
+                                    <h4>{currentUser?.name || 'Nama Pengguna'}</h4>
+                                    <p>{currentUser?.email || 'email@example.com'}</p>
                                 </div>
                             </div>
-                            
+
                             <div className="rating-section">
                                 <label className="rating-label">Berikan rating Anda</label>
                                 <div className="star-rating">
@@ -525,9 +770,9 @@ const Index = () => {
                                     </span>
                                 </div>
                             </div>
-                            
-                            <textarea 
-                                className="comment-input" 
+
+                            <textarea
+                                className="comment-input"
                                 id="commentText"
                                 placeholder="Tulis pengalaman Anda menggunakan layanan rental motor kami..."
                                 maxLength="500"
@@ -535,15 +780,15 @@ const Index = () => {
                                 onChange={handleCommentChange}
                                 disabled={submitTestimonialLoading}
                             ></textarea>
-                            
+
                             <div className="comment-footer">
                                 <div className="char-counter">
                                     <span id="charCount">{commentText.length}</span>/500 karakter
                                 </div>
-                                <button 
-                                    type="button" 
-                                    className="submit-btn" 
-                                    onClick={handleSubmitTestimonial} 
+                                <button
+                                    type="button"
+                                    className="submit-btn"
+                                    onClick={handleSubmitTestimonial}
                                     disabled={!commentText || rating === 0 || submitTestimonialLoading}
                                 >
                                     {submitTestimonialLoading ? 'Mengirim...' : 'Kirim Testimoni'}
@@ -566,17 +811,20 @@ const Index = () => {
                 <div className="container">
                     <h2>Testimoni Pelanggan</h2>
                     <div className="comments-count">{allTestimonials.length} COMMENTS</div>
-                    
+
                     <div className="comments-container">
                         {allTestimonials.length > 0 ? (
                             allTestimonials.map((testimonial) => (
                                 <TestimonialItem
-                                    key={testimonial.id} // Asumsi ada ID dari backend
-                                    avatarInitials={testimonial.user_name ? testimonial.user_name.split(' ').map(n => n[0]).join('') : 'U'}
-                                    name={testimonial.user_name || 'Pengguna'} // Asumsi user_name dari join
-                                    rating={'⭐'.repeat(testimonial.rating)} // Asumsi rating angka
-                                    date={formatDate(testimonial.created_at)} // Asumsi created_at dari backend
-                                    text={testimonial.content} // Asumsi content dari backend
+                                    key={testimonial.id}
+                                    avatarInitials={testimonial.user_nama_lengkap ?
+                                        testimonial.user_nama_lengkap.split(' ').map(n => n[0]).join('').toUpperCase() :
+                                        'U'
+                                    }
+                                    name={testimonial.user_nama_lengkap || 'Pengguna'}
+                                    rating={'⭐'.repeat(testimonial.rating)}
+                                    date={formatDate(testimonial.created_at)}
+                                    text={testimonial.content}
                                 />
                             ))
                         ) : (
@@ -603,7 +851,7 @@ const Index = () => {
                                 <label>Merk Motor:</label>
                                 <select id="merkMotor" name="merkMotor" value={selectedMerk} onChange={handleMerkChange} disabled={submitReservationLoading}>
                                     <option value="">Pilih Merk</option>
-                                    {getUniqueBrands().map(merk => ( // Ambil dari getUniqueBrands
+                                    {getUniqueBrands().map(merk => (
                                         <option key={merk} value={merk}>{merk}</option>
                                     ))}
                                 </select>
@@ -619,11 +867,62 @@ const Index = () => {
                             </div>
                             <div className="form-group">
                                 <label>Nama Lengkap:</label>
-                                <input type="text" id="namaLengkap" name="namaLengkap" placeholder="Nama sesuai KTP" required disabled={submitReservationLoading} />
+                                <input
+                                    type="text"
+                                    id="namaLengkap"
+                                    name="namaLengkap"
+                                    value={currentUser?.nama_lengkap || ''}
+                                    placeholder="Nama sesuai KTP"
+                                    required
+                                    readOnly
+                                    style={{
+                                        backgroundColor: '#f5f5f5',
+                                        cursor: 'not-allowed',
+                                        color: '#666'
+                                    }}
+                                />
+                                {/* Hidden input untuk memastikan data terkirim */}
+                                <input
+                                    type="hidden"
+                                    name="namaLengkapHidden"
+                                    value={currentUser?.nama_lengkap || ''}
+                                />
+                                <small style={{ color: '#666', fontSize: '12px' }}>
+                                    * Data ini diambil dari profil akun Anda
+                                    {!currentUser?.nama_lengkap &&
+                                        <span style={{color: 'red'}}> - Nama tidak ditemukan, silakan update profil</span>
+                                    }
+                                </small>
                             </div>
+
                             <div className="form-group">
                                 <label>No. HP:</label>
-                                <input type="tel" id="noHp" name="noHp" placeholder="08123456789" required disabled={submitReservationLoading} />
+                                <input
+                                    type="tel"
+                                    id="noHp"
+                                    name="noHp"
+                                    value={currentUser?.no_hp || ''}
+                                    placeholder="08123456789"
+                                    required
+                                    readOnly
+                                    style={{
+                                        backgroundColor: '#f5f5f5',
+                                        cursor: 'not-allowed',
+                                        color: '#666'
+                                    }}
+                                />
+                                {/* Hidden input untuk memastikan data terkirim */}
+                                <input
+                                    type="hidden"
+                                    name="noHpHidden"
+                                    value={currentUser?.no_hp || ''}
+                                />
+                                <small style={{ color: '#666', fontSize: '12px' }}>
+                                    * Data ini diambil dari profil akun Anda
+                                    {!currentUser?.no_hp &&
+                                        <span style={{color: 'red'}}> - Nomor HP tidak ditemukan, silakan update profil</span>
+                                    }
+                                </small>
                             </div>
                             <div className="form-group">
                                 <label>Tanggal Sewa:</label>
@@ -631,7 +930,31 @@ const Index = () => {
                             </div>
                             <div className="form-group">
                                 <label>Lama Sewa (hari):</label>
-                                <input type="number" id="lamaSewa" name="lamaSewa" min="1" placeholder="1" required disabled={submitReservationLoading} />
+                                <input type="number" id="lama_sewa" name="lama_sewa" min="1" placeholder="1" required disabled={submitReservationLoading} />
+                            </div>
+                            <div className="form-group">
+                                <label>Lokasi Jemput:</label>
+                                <input
+                                    type="text"
+                                    id="lokasi_jemput"
+                                    name="lokasi_jemput"
+                                    placeholder="Masukkan alamat untuk penjemputan motor"
+                                    required
+                                    disabled={submitReservationLoading}
+                                />
+                                <small style={{ color: '#666', fontSize: '12px' }}>
+                                    * Alamat lengkap tempat motor akan dijemput
+                                </small>
+                            </div>
+                            <div className="form-group">
+                                <label>Catatan Reservasi (Opsional):</label>
+                                <textarea
+                                    id="catatan"
+                                    name="catatanReservasi"
+                                    placeholder="Tuliskan catatan khusus untuk reservasi Anda..."
+                                    disabled={submitReservationLoading}
+                                    style={{ minHeight: '80px', resize: 'vertical' }}
+                                ></textarea>
                             </div>
                             <div className="form-actions">
                                 <button type="button" className="btn-cancel" onClick={closeReservasiPopup} disabled={submitReservationLoading}>
@@ -641,19 +964,14 @@ const Index = () => {
                                     {submitReservationLoading ? 'Mengirim...' : 'Kirim Reservasi'}
                                 </button>
                             </div>
-                            {error && (
-                                <div className="error-alert">
-                                    <span className="error-icon">⚠️</span>
-                                    {error}
-                                    <button className="error-close" onClick={() => setError(null)}>✖️</button>
-                                </div>
-                            )}
                         </form>
                     </div>
                 </div>
             )}
+
             <Footer />
         </>
     );
-}
+};
+
 export default Index;

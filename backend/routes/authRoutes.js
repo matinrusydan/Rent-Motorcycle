@@ -32,4 +32,6 @@ router.delete('/admin/reject-user/:id', verifyToken, authorizeRole(['admin']), a
 // ✅ Rute baru: Mendapatkan semua pengguna (untuk admin)
 router.get('/admin/users', verifyToken, authorizeRole(['admin']), authController.getAllUsers); 
 
+router.put('/admin/profile', verifyToken, authorizeRole(['admin']), authController.updateAdminProfile); 
+
 module.exports = router;
