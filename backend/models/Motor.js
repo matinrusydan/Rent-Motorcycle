@@ -60,16 +60,18 @@ class Motor {
 
     // Create new motor
     static async create(motorData) {
+        console.log('motorData in Motor.create:', motorData);
         try {
-            const { brand, type, harga_sewa, specs, status, description, gambar_motor } = motorData;
+            // Mengubah 'harga_sewa' menjadi 'price' agar sesuai dengan skema database
+            const { brand, type, price, specs, status, description, gambar_motor } = motorData;
 
             const query = `
-                INSERT INTO motors (brand, type, harga_sewa, specs, status, description, gambar_motor)
+                INSERT INTO motors (brand, type, price, specs, status, description, gambar_motor)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             `;
 
             const [result] = await db.query(query, [
-                brand, type, harga_sewa, specs, status || 'available', description, gambar_motor
+                brand, type, price, specs, status || 'available', description, gambar_motor
             ]);
 
             return await Motor.getById(result.insertId);
@@ -81,13 +83,14 @@ class Motor {
     // Update motor
     static async update(id, motorData) {
         try {
-            const { brand, type, harga_sewa, specs, status, description, gambar_motor } = motorData;
+            // Mengubah 'harga_sewa' menjadi 'price' agar sesuai dengan skema database
+            const { brand, type, price, specs, status, description, gambar_motor } = motorData;
 
             let query = `
                 UPDATE motors
-                SET brand = ?, type = ?, harga_sewa = ?, specs = ?, status = ?, description = ?
+                SET brand = ?, type = ?, price = ?, specs = ?, status = ?, description = ?
             `;
-            const params = [brand, type, harga_sewa, specs, status, description];
+            const params = [brand, type, price, specs, status, description];
 
             // Only update image if provided
             if (gambar_motor) {

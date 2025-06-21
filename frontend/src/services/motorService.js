@@ -69,35 +69,21 @@ class MotorService {
 
     // Create new motor
     async createMotor(motorData) {
-        const formData = new FormData();
-        
-        Object.keys(motorData).forEach(key => {
-            if (motorData[key] !== null && motorData[key] !== undefined) {
-                formData.append(key, motorData[key]);
-            }
-        });
-
         return await this.makeRequest(this.endpoint, {
             method: 'POST',
-            body: formData
+            body: motorData // langsung pakai FormData dari Motor.jsx
         });
     }
+
 
     // Update motor
     async updateMotor(id, motorData) {
-        const formData = new FormData();
-        
-        Object.keys(motorData).forEach(key => {
-            if (motorData[key] !== null && motorData[key] !== undefined) {
-                formData.append(key, motorData[key]);
-            }
-        });
-
         return await this.makeRequest(`${this.endpoint}/${id}`, {
             method: 'PUT',
-            body: formData
+            body: motorData // langsung kirim FormData yang sudah disiapkan di React
         });
     }
+
 
     // Delete motor
     async deleteMotor(id) {
@@ -123,11 +109,13 @@ class MotorService {
     }
 
     // Helper method to get image URL
-    getImageUrl(imageName) {
-        if (!imageName) return null;
+    // Helper method to get image URL
+    getImageUrl(imagePath) {
+        if (!imagePath) return null;
         const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-        return `${baseURL}/uploads/${imageName}`;
+        return `${baseURL}/${imagePath}`; // langsung pakai path dari DB
     }
+
 }
 
 // Create singleton instance

@@ -131,6 +131,8 @@ const getMotorAvailability = async (req, res) => {
 };
 
 const createMotor = async (req, res) => {
+    console.log('req.body in createMotor:', req.body); // Tambahkan ini
+    console.log('req.file in createMotor:', req.file); 
     try {
         // Asumsi `gambar_motor` adalah path file yang diupload oleh multer
         const motorData = {
