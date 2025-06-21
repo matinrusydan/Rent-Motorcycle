@@ -5,7 +5,7 @@ const express = require('express');
 const cors = require('cors');
 const db = require('./config/db');
 const path = require('path');
-const multer = require('multer'); // Pastikan multer diimpor untuk middleware error
+const multer = require('multer'); 
 
 // --- IMPOR ROUTES ---
 const authRoutes = require('./routes/authRoutes');
@@ -74,8 +74,7 @@ app.use((err, req, res, next) => {
     res.status(err.status || 500).json({ success: false, message: err.message || 'Terjadi kesalahan server internal.' });
 });
 
-// Handle 404 routes (INI HARUS PALING AKHIR SETELAH SEMUA ROUTE API ANDA DIDAFATARKAN)
-app.use('/', (req, res) => { // Menggunakan '*' atau '/' untuk menangani semua rute yang tidak cocok
+app.use('/', (req, res) => { 
     res.status(404).json({ success: false, message: `Rute ${req.originalUrl} tidak ditemukan.` });
 });
 // Start server

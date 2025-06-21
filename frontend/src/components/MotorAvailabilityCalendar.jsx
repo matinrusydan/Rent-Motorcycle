@@ -22,7 +22,7 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
     const formatDate = (date) => {
         if (!date) return '-';
         try {
-            // Pastikan 'date' adalah objek Date. Jika dari state atau prop, mungkin perlu new Date(dateStr)
+        
             const dateObj = typeof date === 'string' ? new Date(date) : date;
             if (isNaN(dateObj.getTime())) {
                 throw new Error("Invalid Date object for formatDate");
@@ -60,7 +60,7 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
                 }
             );
 
-            // Pastikan data reservasi memiliki tanggal_mulai dan tanggal_selesai
+          
             setReservations(response.data.data.reservations || []);
         } catch (err) {
             console.error('Error fetching reservations for calendar:', err);
@@ -69,13 +69,13 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
         } finally {
             setLoading(false);
         }
-    }, [motorId, currentMonth]); // Dependensi: motorId, currentMonth
+    }, [motorId, currentMonth]); 
 
     useEffect(() => {
         fetchReservations();
-    }, [fetchReservations]); // Panggil fetchReservations saat motorId atau currentMonth berubah
+    }, [fetchReservations]); 
 
-    // Fungsi helper untuk mendapatkan tanggal dalam sebulan
+  
     const getDaysInMonth = (date) => {
         const year = date.getFullYear();
         const month = date.getMonth();
@@ -85,11 +85,9 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
         const startingDayOfWeek = firstDay.getDay(); // 0 (Minggu) sampai 6 (Sabtu)
 
         const days = [];
-        // Sel kosong untuk hari sebelum tanggal 1
         for (let i = 0; i < startingDayOfWeek; i++) {
             days.push(null);
         }
-        // Hari-hari dalam sebulan
         for (let day = 1; day <= daysInMonth; day++) {
             days.push(new Date(year, month, day));
         }
@@ -99,12 +97,11 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
     // Mengecek apakah tanggal dipesan
     const isDateReserved = (date) => {
         if (!date) return false;
-        const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()); // Normalize to start of day
+        const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()); 
 
         return reservations.some(reservation => {
             const start = new Date(reservation.tanggal_mulai);
-            const end = new Date(reservation.tanggal_selesai);
-            // Normalize reservation dates to start of day for accurate comparison
+            const end = new Date(reservation.tanggal_selesai)
             start.setHours(0,0,0,0);
             end.setHours(0,0,0,0);
             
@@ -116,7 +113,7 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
     const isDateInPast = (date) => {
         if (!date) return false;
         const today = new Date();
-        today.setHours(0, 0, 0, 0); // Normalize today to start of day
+        today.setHours(0, 0, 0, 0); 
         return date < today;
     };
 
@@ -147,12 +144,11 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
 
     // Handler klik tanggal
     const handleDateClick = (date) => {
-        if (!date || isDateInPast(date) || loading) return; // Tidak bisa memilih tanggal lalu atau saat loading
+        if (!date || isDateInPast(date) || loading) return; 
 
-        const clickedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()); // Normalize clicked date
+        const clickedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()); 
 
         if (!selectedDates.startDate || (selectedDates.startDate && selectedDates.endDate)) {
-            // Memulai pilihan baru atau reset pilihan yang sudah selesai
             setSelectedDates({ startDate: clickedDate, endDate: null, duration: 1 });
             onDateSelect && onDateSelect({ startDate: clickedDate.toISOString().split('T')[0], endDate: null, duration: 1 });
         } else if (selectedDates.startDate && !selectedDates.endDate) {
