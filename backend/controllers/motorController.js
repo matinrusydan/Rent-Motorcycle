@@ -544,6 +544,126 @@ const getMotorAvailabilityDetails = async (req, res) => {
     }
 };
 
+// Tambahkan fungsi ini ke motorController.js untuk akses public
+
+const getAvailableMotorsPublic = async (req, res) => {
+    let connection;
+    try {
+        const { tanggal_mulai, lama_sewa, brand } = req.query;
+        let tanggalSelesaiFormatted;
+
+        // Validasi input tanggal dan lama sewa (sama seperti versi admin)
+        if (tanggal_mulai && lama_sewa) {
+            const startDate = new Date(tanggal_mulai);
+            const duration = parseInt(lama_sewa);
+
+            if (isNaN(startDate.getTime())) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Format tanggal_mulai tidak valid. Gunakan format YYYY-MM-DD.' 
+                });
+            }
+
+            if (isNaN(duration) || duration <= 0) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Lama_sewa tidak valid (harus angka positif).' 
+                });
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            startDate.setHours(0, 0, 0, 0);
+            
+            if (startDate < today) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Tanggal mulai sewa tidak boleh di masa lalu.' 
+                });
+            }
+
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + duration);
+            tanggalSelesaiFormatted = endDate.toISOString().slice(0, 10);
+        }
+
+        connection = await db.getConnection();
+
+        // Query untuk motor yang tersedia (PUBLIC - tanpa autentikasi)
+        let query = `
+            SELECT
+                m.id,
+                m.brand,
+                m.type,
+                m.price,
+                m.specs,
+                m.status,
+                m.description,
+                m.gambar_motor,
+                m.created_at,
+                m.updated_at
+            FROM motors m
+            WHERE m.status = 'available'
+        `;
+        const params = [];
+
+        // Filter berdasarkan brand jika disediakan
+        if (brand && brand !== 'all' && brand.trim() !== '') {
+            query += ' AND LOWER(m.brand) = LOWER(?)';
+            params.push(brand.trim());
+        }
+
+        // Logika pengecekan overlap reservasi jika tanggal dan lama sewa disediakan
+        if (tanggal_mulai && tanggalSelesaiFormatted) {
+            query += `
+                AND m.id NOT IN (
+                    SELECT DISTINCT r.motor_id
+                    FROM reservasi r
+                    WHERE r.status IN ('pending', 'confirmed', 'completed')
+                    AND NOT (
+                        r.tanggal_selesai < ? 
+                        OR 
+                        r.tanggal_mulai > ?
+                    )
+                )
+            `;
+            params.push(tanggal_mulai, tanggalSelesaiFormatted);
+        }
+
+        query += ' ORDER BY m.brand ASC, m.type ASC';
+
+        console.log('Public Motors Query:', query);
+        console.log('Public Motors Params:', params);
+
+        const [motors] = await connection.execute(query, params);
+
+        console.log(`Found ${motors.length} available motors for public`);
+
+        res.json({ 
+            success: true, 
+            data: motors, 
+            message: 'Available motors retrieved successfully.',
+            total_found: motors.length
+        });
+
+    } catch (error) {
+        console.error('Error in getAvailableMotorsPublic:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Gagal mengambil daftar motor yang tersedia.', 
+            error: error.message 
+        });
+    } finally {
+        if (connection) connection.release();
+    }
+};
+
+// Export function yang baru
+module.exports = {
+    // ... existing exports
+    getAvailableMotorsPublic,
+    // ... other exports
+};
 
 module.exports = {
     getAllMotors,
@@ -557,5 +677,6 @@ module.exports = {
     checkMotorFutureReservations,
     getMotorAvailabilityDetails,
     checkDateOverlap,
-    getMotorAvailability
+    getMotorAvailability,
+    getAvailableMotorsPublic
 };

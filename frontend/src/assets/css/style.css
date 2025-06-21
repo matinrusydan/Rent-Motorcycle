@@ -382,6 +382,33 @@ body {
     border-radius: var(--radius-sm);
 }
 
+/* Contoh gaya CSS yang dibutuhkan */
+.motor-card .motor-image {
+    width: 100%;
+    height: 180px; /* Sesuaikan tinggi sesuai desain Anda */
+    overflow: hidden;
+    display: flex; /* Memusatkan konten (gambar/placeholder) */
+    align-items: center;
+    justify-content: center;
+    background-color: #f0f0f0; /* Warna latar belakang fallback */
+}
+
+.motor-card .motor-image img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain; /* Memastikan gambar terlihat utuh */
+}
+
+.motor-card .image-placeholder {
+    display: flex; /* Awalnya flex, akan disembunyikan jika gambar ada */
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-size: 3rem; /* Ukuran ikon placeholder */
+    color: #ccc;
+    background-color: #f9f9f9;
+}
 /* General paragraph styling within motor section */
 .motor-section p {
     color: var(--gray-600);

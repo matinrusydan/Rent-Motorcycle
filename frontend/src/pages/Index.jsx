@@ -11,7 +11,7 @@ import MotorAvailabilityCalendar from '../components/MotorAvailabilityCalendar.j
 // CSS yang relevan
 import '../assets/css/style.css';
 import '../assets/css/global.css';
-import '../assets/css/motor-calendar.css'; // <<< PASTIKAN DIIMPOR
+import '../assets/css/motor-calendar.css'; 
 
 // Component untuk menampilkan testimoni
 const TestimonialItem = ({ avatarInitials, name, rating, date, text }) => {
@@ -50,11 +50,10 @@ const Index = () => {
     const [selectedMerk, setSelectedMerk] = useState('');
     const [availableTipeMotor, setAvailableTipeMotor] = useState([]);
     const [currentTipeMotor, setCurrentTipeMotor] = useState('');
-    // State untuk input tanggal dan lama sewa di form reservasi
-    const [tanggalSewaInput, setTanggalSewaInput] = useState(''); // Akan diisi dari kalender
-    const [lamaSewaInput, setLamaSewaInput] = useState(''); // Akan diisi dari kalender
-    const [availableMotorsFilteredByDate, setAvailableMotorsFilteredByDate] = useState([]); // Motor yang tersedia setelah filter tanggal
-    const [selectedMotorForCalendar, setSelectedMotorForCalendar] = useState(null); // Motor yang dipilih untuk ditampilkan di kalender
+    const [tanggalSewaInput, setTanggalSewaInput] = useState(''); 
+    const [lamaSewaInput, setLamaSewaInput] = useState(''); 
+    const [availableMotorsFilteredByDate, setAvailableMotorsFilteredByDate] = useState([]); 
+    const [selectedMotorForCalendar, setSelectedMotorForCalendar] = useState(null); 
 
 
     // State untuk form testimoni
@@ -72,11 +71,12 @@ const Index = () => {
     };
 
 
+
     const debugUserData = () => {
         const userStr = localStorage.getItem('user');
         if (userStr) {
             try {
-                const user = JSON.parse(userStr);
+                JSON.parse(userStr);
             } catch (e) {
                 console.error('Error parsing user data:', e);
             }
@@ -603,7 +603,7 @@ const handleReservasiSubmit = async (e) => {
                         <button className="btn-primary" onClick={() => openReservasiPopup()}>Reservasi Sekarang</button>
                     </div>
                     <div className="hero-image">
-                        <div className="motor-placeholder">🏍️</div>
+                        <img src="/images/imageLogin.jpg" alt="Motor Hero" />
                     </div>
                 </div>
             </section>
@@ -646,11 +646,13 @@ const handleReservasiSubmit = async (e) => {
                                                             {getMotorsForBrandSlide(brand, slideIndex).map(motor => (
                                                                 <MotorCard 
                                                                     key={motor.id}
+                                                                    motorId={motor.id} // Tambahkan motorId
                                                                     brand={motor.brand} 
                                                                     type={motor.type} 
-                                                                    price={formatPrice(motor.price)} // Fix: use motor.price
-                                                                    specs={motor.specs} 
-                                                                    openReservasiPopup={() => openReservasiPopup(motor.brand, motor.type)} 
+                                                                    price={formatPrice(motor.price)}
+                                                                    specs={motor.specs}
+                                                                    gambar_motor={motor.gambar_motor} // TAMBAHKAN INI - field gambar dari database
+                                                                    openReservasiPopup={() => openReservasiPopup(motor.brand, motor.type, motor.id)} 
                                                                 />
                                                             ))}
                                                         </div>

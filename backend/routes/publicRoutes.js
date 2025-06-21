@@ -7,6 +7,7 @@ const reservationController = require('../controllers/reservationController'); /
 const { verifyToken, authorizeRole } = require('../middlewares/authMiddleware'); // Pastikan ini diimpor jika belum
 
 
+router.get('/motors/available', motorController.getAvailableMotorsPublic);
 router.get('/motors/available', motorController.getAvailableMotors);
 router.get('/motors/:motorId/availability', motorController.getMotorAvailability);
 router.get('/testimonials/approved', testimonialController.getApprovedTestimonials);
