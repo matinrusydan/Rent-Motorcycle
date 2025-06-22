@@ -12,7 +12,6 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
     const [selectedDates, setSelectedDates] = useState({ startDate: null, endDate: null, duration: 0 });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [selectionMode, setSelectionMode] = useState('start'); // 'start', 'end', 'complete'
 
     const getApiUrl = () => {
         return import.meta.env.VITE_APP_API_URL || 'http://localhost:5000';
@@ -37,6 +36,20 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
         }
     };
 
+    // FIXED: Function untuk format tanggal ke format YYYY-MM-DD dengan timezone yang benar
+    const formatDateToISO = (date) => {
+        if (!date) return '';
+        try {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        } catch (e) {
+            console.error("Error formatting date to ISO:", date, e);
+            return '';
+        }
+    };
+
     const fetchReservations = useCallback(async () => {
         if (!motorId) {
             setReservations([]);
@@ -52,8 +65,8 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
                 `${getApiUrl()}/api/motors/${motorId}/availability`,
                 {
                     params: {
-                        start_date: startOfMonth.toISOString().split('T')[0],
-                        end_date: endOfMonth.toISOString().split('T')[0]
+                        start_date: formatDateToISO(startOfMonth),
+                        end_date: formatDateToISO(endOfMonth)
                     }
                 }
             );
@@ -89,7 +102,7 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
         return days;
     };
 
-    const isDateReserved = (date) => {
+    const isDateReserved = useCallback((date) => {
         if (!date) return false;
         const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
@@ -101,14 +114,14 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
             
             return targetDate >= start && targetDate <= end;
         });
-    };
+    }, [reservations]);
 
-    const isDateInPast = (date) => {
+    const isDateInPast = useCallback((date) => {
         if (!date) return false;
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         return date < today;
-    };
+    }, []);
 
     const isDateSelected = (date) => {
         if (!date || !selectedDates.startDate) return false;
@@ -133,104 +146,113 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
         return dates;
     };
 
-    const checkDateRangeAvailability = (startDate, endDate) => {
-        const datesInRange = getDatesInRange(startDate, endDate);
-        for (let date of datesInRange) {
-            if (isDateReserved(date) || isDateInPast(date)) {
-                return { available: false, conflictDate: date };
-            }
-        }
-        return { available: true, conflictDate: null };
-    };
+    // FIXED: Handler klik tanggal yang diperbaiki untuk memungkinkan rentang lebih dari 1 hari
+    const handleDateClick = useCallback((date) => {
+        if (!date || isDateInPast(date) || loading || isDateReserved(date)) return;
 
-    // FIXED: Improved date selection logic
-    const handleDateClick = (date) => {
-        if (!date || isDateInPast(date) || isDateReserved(date) || loading) {
-            return;
-        }
+        console.log('=== CALENDAR DATE CLICK DEBUG ===');
+        console.log('Clicked date:', date);
+        console.log('Current selected dates:', selectedDates);
 
+        // FIXED: Pastikan tanggal yang dipilih tepat sesuai dengan yang diklik
         const clickedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-        // If no start date selected, or if we're starting fresh
-        if (selectionMode === 'start' || !selectedDates.startDate) {
+        
+        if (!selectedDates.startDate || (selectedDates.startDate && selectedDates.endDate)) {
+            // FIXED: Memulai pilihan baru - hanya set startDate tanpa endDate
             const newSelection = { 
                 startDate: clickedDate, 
-                endDate: clickedDate, 
-                duration: 1 
-            };
-            setSelectedDates(newSelection);
-            setSelectionMode('end');
-
-            // Notify parent component
-            if (onDateSelect) {
-                onDateSelect({
-                    startDate: clickedDate.toISOString().split('T')[0],
-                    endDate: clickedDate.toISOString().split('T')[0],
-                    duration: 1
-                });
-            }
-            return;
-        }
-
-        // If we're selecting end date
-        if (selectionMode === 'end' && selectedDates.startDate) {
-            let startDate = selectedDates.startDate;
-            let endDate = clickedDate;
-
-            // Ensure start date is before end date
-            if (endDate < startDate) {
-                [startDate, endDate] = [endDate, startDate];
-            }
-
-            // Check if the range is available
-            const availability = checkDateRangeAvailability(startDate, endDate);
-            
-            if (!availability.available) {
-                alert(`Tidak dapat memilih rentang tanggal karena ada konflik pada ${formatDate(availability.conflictDate)}. Silakan pilih tanggal lain.`);
-                return;
-            }
-
-            const duration = getDatesInRange(startDate, endDate).length;
-            const newSelection = { 
-                startDate, 
-                endDate, 
-                duration 
+                endDate: null,  // Jangan set endDate di sini
+                duration: 0 
             };
             
+            console.log('Setting new start date:', newSelection);
             setSelectedDates(newSelection);
-            setSelectionMode('complete');
+            
+        } else if (selectedDates.startDate && !selectedDates.endDate) {
+            // Sudah ada tanggal mulai, sekarang pilih tanggal akhir
+            let start = new Date(selectedDates.startDate.getFullYear(), selectedDates.startDate.getMonth(), selectedDates.startDate.getDate());
+            let end = clickedDate;
 
-            // Notify parent component
-            if (onDateSelect) {
-                onDateSelect({
-                    startDate: startDate.toISOString().split('T')[0],
-                    endDate: endDate.toISOString().split('T')[0],
-                    duration
-                });
+            // Jika tanggal akhir lebih kecil dari tanggal mulai, swap
+            if (end < start) {
+                [start, end] = [end, start];
             }
-            return;
-        }
+            
+            const potentialDatesInSelection = getDatesInRange(start, end);
+            
+            // Cek apakah ada tanggal yang tidak tersedia dalam rentang
+            let firstUnavailableDate = null;
+            for (let i = 0; i < potentialDatesInSelection.length; i++) {
+                const d = potentialDatesInSelection[i];
+                if (isDateReserved(d) || isDateInPast(d)) {
+                    firstUnavailableDate = d;
+                    break;
+                }
+            }
 
-        // If selection is complete, start new selection
-        if (selectionMode === 'complete') {
-            const newSelection = { 
-                startDate: clickedDate, 
-                endDate: clickedDate, 
-                duration: 1 
-            };
-            setSelectedDates(newSelection);
-            setSelectionMode('end');
+            if (firstUnavailableDate) {
+                // Batasi rentang jika ada tanggal tidak tersedia
+                const newEndDate = new Date(firstUnavailableDate);
+                newEndDate.setDate(newEndDate.getDate() - 1);
 
-            // Notify parent component
-            if (onDateSelect) {
-                onDateSelect({
-                    startDate: clickedDate.toISOString().split('T')[0],
-                    endDate: clickedDate.toISOString().split('T')[0],
-                    duration: 1
-                });
+                if (newEndDate < start) {
+                    alert('Tanggal mulai pilihan Anda terlalu dekat dengan tanggal yang tidak tersedia. Mohon pilih tanggal mulai yang berbeda.');
+                    // Reset ke single date selection
+                    const resetSelection = { startDate: clickedDate, endDate: null, duration: 0 };
+                    setSelectedDates(resetSelection);
+                    return;
+                }
+
+                const finalDatesInSelection = getDatesInRange(start, newEndDate);
+                const duration = finalDatesInSelection.length;
+                const finalSelection = { startDate: start, endDate: newEndDate, duration };
+                
+                console.log('Setting limited range selection:', finalSelection);
+                setSelectedDates(finalSelection);
+                
+                setTimeout(() => {
+                    if (onDateSelect) {
+                        console.log('Sending limited range to parent:', {
+                            startDate: formatDateToISO(start),
+                            endDate: formatDateToISO(newEndDate),
+                            duration
+                        });
+                        onDateSelect({
+                            startDate: formatDateToISO(start),
+                            endDate: formatDateToISO(newEndDate),
+                            duration
+                        });
+                    }
+                }, 10);
+                
+                if (duration < potentialDatesInSelection.length) {
+                    alert(`Rentang pilihan Anda dibatasi karena ada motor yang tidak tersedia pada ${formatDate(firstUnavailableDate)}.`);
+                }
+            } else {
+                // Rentang penuh tersedia
+                const duration = potentialDatesInSelection.length;
+                const finalSelection = { startDate: start, endDate: end, duration };
+                
+                console.log('Setting full range selection:', finalSelection);
+                setSelectedDates(finalSelection);
+                
+                setTimeout(() => {
+                    if (onDateSelect) {
+                        console.log('Sending full range to parent:', {
+                            startDate: formatDateToISO(start),
+                            endDate: formatDateToISO(end),
+                            duration
+                        });
+                        onDateSelect({
+                            startDate: formatDateToISO(start),
+                            endDate: formatDateToISO(end),
+                            duration
+                        });
+                    }
+                }, 10);
             }
         }
-    };
+    }, [selectedDates, loading, onDateSelect, isDateInPast, isDateReserved]);
 
     const nextMonth = () => {
         setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
@@ -239,7 +261,6 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
     const prevMonth = () => {
         const today = new Date();
         today.setHours(0,0,0,0);
-        const firstDayOfCurrentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
         const prevMonthDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
         
         if (prevMonthDate >= new Date(today.getFullYear(), today.getMonth(), 1)) {
@@ -248,8 +269,8 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
     };
 
     const clearSelection = () => {
+        console.log('Clearing calendar selection');
         setSelectedDates({ startDate: null, endDate: null, duration: 0 });
-        setSelectionMode('start');
         if (onDateSelect) {
             onDateSelect(null);
         }
@@ -260,11 +281,7 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
     return (
         <div className="motor-calendar-container">
             <div className="calendar-header">
-                <button 
-                    onClick={prevMonth} 
-                    className="calendar-nav-btn" 
-                    disabled={loading}
-                >
+                <button onClick={prevMonth} className="calendar-nav-btn" disabled={loading || isDateInPast(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1))}>
                     ←
                 </button>
                 <h3 className="calendar-title">
@@ -286,18 +303,6 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
                 </div>
             )}
 
-            <div className="calendar-instructions">
-                {selectionMode === 'start' && (
-                    <p className="selection-hint">Klik tanggal untuk memulai pemilihan</p>
-                )}
-                {selectionMode === 'end' && (
-                    <p className="selection-hint">Klik tanggal lain untuk menentukan tanggal akhir, atau klik tanggal yang sama untuk 1 hari saja</p>
-                )}
-                {selectionMode === 'complete' && (
-                    <p className="selection-hint">Klik tanggal lain untuk memulai pemilihan baru</p>
-                )}
-            </div>
-
             <div className="calendar-days-of-week">
                 {['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'].map(day => (
                     <div key={day} className="day-of-week-label">
@@ -316,14 +321,19 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
                     const isPast = isDateInPast(date);
                     const isSelected = isDateSelected(date);
                     const isClickable = !isReserved && !isPast;
+                    
+                    // FIXED: Tambahkan styling khusus untuk tanggal mulai saat belum ada tanggal akhir
+                    const isStartDateOnly = selectedDates.startDate && !selectedDates.endDate && 
+                        date.toDateString() === selectedDates.startDate.toDateString();
 
                     const dayClass = `
                         calendar-day
                         ${isSelected ? 'calendar-day-selected' : ''}
+                        ${isStartDateOnly ? 'calendar-day-start-only' : ''}
                         ${isReserved ? 'calendar-day-reserved' : ''}
                         ${isPast ? 'calendar-day-past' : ''}
                         ${isClickable ? 'calendar-day-clickable' : ''}
-                    `.trim();
+                    `;
 
                     return (
                         <button
@@ -341,21 +351,40 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
             {selectedDates.startDate && (
                 <div className="calendar-selection-info">
                     <div className="selection-text">
-                        <span className="selection-label">Periode Dipilih:</span>
-                        <span className="selection-value">
-                            {formatDate(selectedDates.startDate)}
-                        </span>
-                        {selectedDates.endDate && selectedDates.startDate.toDateString() !== selectedDates.endDate.toDateString() && (
+                        {!selectedDates.endDate ? (
                             <>
-                                <span className="selection-label">hingga</span>
+                                <span className="selection-label">Tanggal Mulai:</span>
                                 <span className="selection-value">
-                                    {formatDate(selectedDates.endDate)}
+                                    {formatDate(selectedDates.startDate)}
                                 </span>
+                                <div className="selection-hint">
+                                    Klik tanggal lain untuk memilih rentang sewa
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <span className="selection-label">Periode Dipilih:</span>
+                                <span className="selection-value">
+                                    {formatDate(selectedDates.startDate)}
+                                </span>
+                                {selectedDates.startDate.toDateString() !== selectedDates.endDate.toDateString() && (
+                                    <>
+                                        <span className="selection-label">hingga</span>
+                                        <span className="selection-value">
+                                            {formatDate(selectedDates.endDate)}
+                                        </span>
+                                        <span className="selection-duration">
+                                            ({selectedDates.duration} hari)
+                                        </span>
+                                    </>
+                                )}
+                                {selectedDates.duration === 1 && (
+                                    <span className="selection-duration">
+                                        ({selectedDates.duration} hari)
+                                    </span>
+                                )}
                             </>
                         )}
-                        <span className="selection-duration">
-                            ({selectedDates.duration} hari)
-                        </span>
                     </div>
                     <button
                         onClick={clearSelection}

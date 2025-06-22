@@ -188,12 +188,14 @@ const createReservation = async (req, res) => {
 const getReservationById = async (req, res) => {
     let connection;
     try {
-        const { id } = req.params;
+        const { id } = req.params; // ID reservasi dari parameter URL
         const userIdFromToken = req.user.id; // ID pengguna dari token JWT
+        const userRoleFromToken = req.user.role; // Role pengguna dari token JWT
 
-        connection = await db.getConnection(); // Baris ini memerlukan 'db'
+        connection = await db.getConnection(); 
 
         const [rows] = await connection.execute(
+            // ... (kueri SQL Anda)
             `SELECT
                 r.id,
                 r.user_id,
@@ -222,15 +224,46 @@ const getReservationById = async (req, res) => {
 
         const reservation = rows[0];
 
+        // --- PERBAIKAN DI SINI ---
+        // Log ini seharusnya hanya dijalankan JIKA reservasi ditemukan,
+        // atau gunakan optional chaining untuk menghindari error.
+        // Hapus blok log yang salah tempat ini:
+        /*
+        console.log(`Mengambil Reservasi ID: ${reservationId}`);
+        console.log(`User ID dari Token: ${userIdFromToken} (Role: ${userRoleFromToken})`);
+        console.log(`User ID dari Reservasi (ID ${reservationId}): ${reservation.user_id}`);
+        */
+        // --- AKHIR PERBAIKAN ---
+
         if (!reservation) {
+            console.log(`DEBUG getReservationById: Reservasi ID ${id} tidak ditemukan (404).`);
             return res.status(404).json({ success: false, message: 'Reservasi tidak ditemukan.' });
         }
+        
+        // --- LOG DEBUGGING YANG BENAR DAN TERSTRUKTUR ---
+        // Pindahkan log di bawah `if (!reservation)` agar `reservation` dipastikan ada
+        console.log('--- DEBUG Otorisasi Reservasi ---');
+        console.log(`Mengambil Reservasi ID: ${id}`); // Gunakan `id` dari req.params
+        console.log(`User ID dari Token (req.user.id): ${userIdFromToken} (Role: ${userRoleFromToken})`);
+        console.log(`User ID dari Reservasi (dari DB - reservation.user_id): ${reservation.user_id}`);
+        console.log('---------------------------------');
+        // --- AKHIR LOG DEBUGGING ---
 
-        // Validasi keamanan: Pastikan pengguna hanya dapat melihat reservasi miliknya sendiri
+        // Logika otorisasi utama
+        // Pastikan pengguna dengan peran 'user' hanya bisa melihat reservasi miliknya
+        if (userRoleFromToken === 'user' && reservation.user_id !== userIdFromToken) {
+            console.log(`DEBUG getReservationById: User ID tidak cocok. Reservasi dimiliki oleh ${reservation.user_id}, tetapi token user ID ${userIdFromToken}. Mengembalikan 403.`);
+            return res.status(403).json({ success: false, message: 'Anda tidak memiliki akses ke reservasi ini.' });
+        }
+        // Hapus duplikasi kondisi otorisasi ini:
+        /*
         if (req.user.role === 'user' && reservation.user_id !== userIdFromToken) {
             return res.status(403).json({ success: false, message: 'Anda tidak memiliki akses ke reservasi ini.' });
         }
+        */
 
+        // Jika lolos semua pemeriksaan, kirim detail reservasi
+        console.log('DEBUG getReservationById: Otorisasi berhasil. Mengirim data reservasi.');
         res.status(200).json({ success: true, data: reservation });
 
     } catch (error) {

@@ -2,25 +2,25 @@
 const jwt = require('jsonwebtoken');
 
 const verifyToken = (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-        return res.status(401).json({ message: 'Access denied: No token provided.' });
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (token == null) {
+        console.log('DEBUG: Token null atau tidak ada. Mengembalikan 401.');
+        return res.status(401).json({ message: 'Akses ditolak. Token tidak disediakan.' });
     }
 
-    const token = authHeader.split(' ')[1];
-    if (!token) {
-        return res.status(401).json({ message: 'Access denied: Invalid token format.' });
-    }
-
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded;
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) {
+            console.log('DEBUG: Verifikasi token gagal. Error:', err.message);
+            // Perhatikan: Terkadang, ini bisa mengirim 403 alih-alih 401
+            return res.status(403).json({ message: 'Token tidak valid atau kedaluwarsa.' });
+        }
+        req.user = user;
+        console.log('DEBUG: Token berhasil diverifikasi. req.user:', req.user);
         next();
-    } catch (error) {
-        return res.status(403).json({ message: 'Invalid or expired token.', error: error.message });
-    }
+    });
 };
-
 const authorizeRole = (roles) => {
     return (req, res, next) => {
         if (!req.user || !req.user.role) {
