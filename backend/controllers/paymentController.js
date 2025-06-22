@@ -169,16 +169,64 @@ const uploadPaymentProof = async (req, res) => {
 
 // Fungsi untuk mendapatkan semua pembayaran (untuk admin)
 const getAllPayments = async (req, res) => {
+    let connection;
     try {
+        connection = await db.getConnection();
         const filters = {
             status: req.query.status,
             search: req.query.search
         };
-        const payments = await Payment.findAll(filters);
-        res.json({ success: true, data: payments });
+
+        // Modifikasi kueri untuk melakukan JOIN dengan reservasi, user, dan motor
+        let query = `
+            SELECT
+                p.id,
+                p.reservasi_id,
+                p.jumlah_pembayaran,
+                p.tanggal_pembayaran,
+                p.metode_pembayaran,
+                p.bukti_transfer,
+                p.catatan_pembeli,
+                p.status_pembayaran,
+                p.admin_notes,
+                p.created_at AS payment_created_at,
+                r.tanggal_mulai AS reservasi_tanggal_mulai,
+                r.tanggal_selesai AS reservasi_tanggal_selesai,
+                r.lama_sewa AS reservasi_lama_sewa, -- Mengambil lama_sewa dari reservasi
+                r.total_harga AS reservasi_total_harga,
+                u.nama_lengkap AS user_nama_lengkap,
+                u.email AS user_email,
+                u.no_hp AS user_no_hp, -- Mengambil no_hp dari user
+                m.brand AS motor_brand,
+                m.type AS motor_type
+            FROM pembayaran p
+            JOIN reservasi r ON p.reservasi_id = r.id
+            JOIN users u ON r.user_id = u.id
+            JOIN motors m ON r.motor_id = m.id
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (filters.status && filters.status !== 'all') {
+            query += ' AND p.status_pembayaran = ?';
+            params.push(filters.status);
+        }
+
+        if (filters.search) {
+            const searchTerm = `%${filters.search.toLowerCase()}%`;
+            query += ` AND (LOWER(u.nama_lengkap) LIKE ? OR LOWER(m.brand) LIKE ? OR LOWER(m.type) LIKE ? OR u.no_hp LIKE ?)`;
+            params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+        }
+
+        query += ' ORDER BY p.created_at DESC';
+
+        const [rows] = await connection.execute(query, params);
+        res.json({ success: true, data: rows });
     } catch (error) {
         console.error('Error in getAllPayments (admin):', error);
         res.status(500).json({ success: false, message: 'Gagal mengambil data pembayaran.', error: error.message });
+    } finally {
+        if (connection) connection.release();
     }
 };
 

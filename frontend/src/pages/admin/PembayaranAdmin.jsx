@@ -117,7 +117,8 @@ const PembayaranAdmin = () => {
     const formatCurrency = (amount) => {
         // Memastikan input adalah angka dan menanganinya jika NaN
         const numAmount = parseFloat(amount);
-        return isNaN(numAmount) ? 'Rp 0' : `Rp ${numAmount.toLocaleString('id-ID')}`;
+        // Memformat menjadi Rupiah tanpa desimal
+        return isNaN(numAmount) ? 'Rp 0' : `Rp ${numAmount.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
     };
 
     // Fungsi untuk format tanggal
@@ -375,7 +376,7 @@ const PembayaranAdmin = () => {
                                                                 <td>
                                                                     <div className="motor-info">
                                                                         <div className="motor-name">{pembayaran.motor_brand} {pembayaran.motor_type}</div>
-                                                                        <div className="motor-duration">{pembayaran.lama_sewa} hari</div>
+                                                                        <div className="motor-duration">{pembayaran.reservasi_lama_sewa} hari</div>
                                                                     </div>
                                                                 </td>
                                                                 <td>{formatDate(pembayaran.reservasi_tanggal_mulai)}</td>
@@ -493,7 +494,7 @@ const PembayaranAdmin = () => {
                                     </div>
                                     <div className="detail-item">
                                         <label>Lama Sewa:</label>
-                                        <span>{selectedPembayaran.lama_sewa} hari</span>
+                                        <span>{selectedPembayaran.reservasi_lama_sewa} hari</span> {/* <-- Perbaikan di sini */}
                                     </div>
                                     <div className="detail-item">
                                         <label>Total Reservasi:</label>
