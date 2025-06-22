@@ -6,7 +6,7 @@ import axios from 'axios';
 import Header from '../components/Header.jsx';
 import Footer from '../components/Footer.jsx';
 import MotorCard from '../components/MotorCard.jsx';
-import MotorAvailabilityCalendar from '../components/MotorAvailabilityCalendar.jsx'; // <<< IMPORT KALENDER
+import MotorAvailabilityCalendar from '../components/MotorAvailabilityCalendar.jsx'; 
 
 // CSS yang relevan
 import '../assets/css/style.css';
@@ -31,21 +31,18 @@ const TestimonialItem = ({ avatarInitials, name, rating, date, text }) => {
 };
 
 const Index = () => {
-    // State untuk data dinamis
     const [allMotors, setAllMotors] = useState([]);
     const [motorBrands, setMotorBrands] = useState([]);
     const [allTestimonials, setAllTestimonials] = useState([]);
     const [showAllBrands, setShowAllBrands] = useState(false);
     const [brandSliders, setBrandSliders] = useState({});
 
-    // State untuk UI feedback
     const [loadingMotors, setLoadingMotors] = useState(true);
     const [loadingTestimonials, setLoadingTestimonials] = useState(true);
     const [error, setError] = useState(null);
     const [submitReservationLoading, setSubmitReservationLoading] = useState(false);
     const [submitTestimonialLoading, setSubmitTestimonialLoading] = useState(false);
 
-    // State untuk form reservasi popup
     const [reservasiPopupOpen, setReservasiPopupOpen] = useState(false);
     const [selectedMerk, setSelectedMerk] = useState('');
     const [availableTipeMotor, setAvailableTipeMotor] = useState([]);
@@ -55,22 +52,20 @@ const Index = () => {
     const [availableMotorsFilteredByDate, setAvailableMotorsFilteredByDate] = useState([]); 
     const [selectedMotorForCalendar, setSelectedMotorForCalendar] = useState(null); 
 
-
-    // State untuk form testimoni
     const [commentText, setCommentText] = useState('');
     const [rating, setRating] = useState(0);
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
-    // State untuk data user yang login
     const [currentUser, setCurrentUser] = useState(null);
+
+    // FIXED: Ref untuk mencegah multiple API calls
+    const isFilteringByDate = useRef(false);
 
     const navigate = useNavigate();
 
     const getApiUrl = () => {
         return import.meta.env.VITE_APP_API_URL || 'http://localhost:5000';
     };
-
-
 
     const debugUserData = () => {
         const userStr = localStorage.getItem('user');
@@ -105,33 +100,14 @@ const Index = () => {
         }
     }, []);
 
-
-    // Mengambil motor yang tersedia berdasarkan tanggal
-    const fetchPublicMotors = useCallback(async (tanggalMulai = null, lamaSewa = null) => {
+    // Mengambil motor yang tersedia secara umum (untuk slider utama)
+    const fetchAllMotorsForSliders = useCallback(async () => {
         setLoadingMotors(true);
         try {
-            let url = `${getApiUrl()}/api/motors/available`;
-            const params = new URLSearchParams();
-
-            if (tanggalMulai) params.append('tanggal_mulai', tanggalMulai);
-            if (lamaSewa) params.append('lama_sewa', lamaSewa);
-            
-            if (params.toString()) {
-                url += `?${params.toString()}`;
-            }
-
-            const response = await axios.get(url);
+            const response = await axios.get(`${getApiUrl()}/api/motors/available`);
             const motors = response.data.data;
-            setAllMotors(motors); // Ini adalah daftar motor yang tersedia secara umum (untuk slider utama)
+            setAllMotors(motors); 
 
-            // Gunakan daftar motor yang difilter tanggal untuk dropdown di popup reservasi
-            if (tanggalMulai && lamaSewa) {
-                setAvailableMotorsFilteredByDate(motors); // Ini akan digunakan untuk filter di dalam popup
-            } else {
-                setAvailableMotorsFilteredByDate(motors); // Awalnya sama dengan allMotors jika belum ada filter tanggal
-            }
-
-            // Ekstrak merk unik untuk filter slider (dari allMotors)
             const brands = [...new Set(motors.map(m => m.brand))];
             setMotorBrands(brands.filter(b => b));
 
@@ -144,12 +120,63 @@ const Index = () => {
             setBrandSliders(sliderStates);
 
         } catch (err) {
-            console.error('Error fetching public motors:', err);
+            console.error('Error fetching all motors for sliders:', err);
             setError(`Gagal memuat daftar motor: ${err.message}`);
             setAllMotors([]);
             setMotorBrands([]);
         } finally {
             setLoadingMotors(false);
+        }
+    }, []);
+
+    // FIXED: Mengambil motor yang tersedia berdasarkan filter tanggal
+    const fetchFilteredMotorsByDate = useCallback(async (motorId, tanggalMulai, lamaSewa) => {
+        // FIXED: Mencegah multiple calls
+        if (isFilteringByDate.current) {
+            return;
+        }
+        
+        isFilteringByDate.current = true;
+        
+        try {
+            let url = `${getApiUrl()}/api/motors/available`;
+            const params = new URLSearchParams();
+
+            if (motorId) params.append('motor_id', motorId);
+            if (tanggalMulai) params.append('tanggal_mulai', tanggalMulai);
+            if (lamaSewa) params.append('lama_sewa', lamaSewa);
+            
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
+
+            const response = await axios.get(url);
+            const motors = response.data.data;
+            setAvailableMotorsFilteredByDate(motors);
+            
+            // Set merk dan tipe motor terpilih di dropdown reservasi jika motorId sudah ada
+            const chosenMotor = motors.find(m => m.id === motorId);
+            if(chosenMotor) {
+                setSelectedMerk(chosenMotor.brand);
+                setCurrentTipeMotor(chosenMotor.type);
+                const motorOfType = motors.filter(m => m.brand === chosenMotor.brand);
+                const uniqueTypes = [...new Set(motorOfType.map(m => m.type))];
+                setAvailableTipeMotor(uniqueTypes.filter(t => t));
+            } else {
+                setSelectedMerk('');
+                setAvailableTipeMotor([]);
+                setCurrentTipeMotor('');
+            }
+
+        } catch (err) {
+            console.error('Error fetching filtered motors by date:', err);
+            setError(`Gagal memuat motor untuk tanggal yang dipilih: ${err.message}`);
+            setAvailableMotorsFilteredByDate([]);
+            setSelectedMerk('');
+            setAvailableTipeMotor([]);
+            setCurrentTipeMotor('');
+        } finally {
+            isFilteringByDate.current = false;
         }
     }, []);
 
@@ -167,7 +194,6 @@ const Index = () => {
         }
     }, []);
 
-
     const fetchUserProfile = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
@@ -184,25 +210,14 @@ const Index = () => {
     }, [getCurrentUser]);
 
     useEffect(() => {
-        fetchPublicMotors();
+        fetchAllMotorsForSliders();
         fetchPublicTestimonials();
         fetchUserProfile().then(user => { if (!user) { getCurrentUser(); } });
-    }, [fetchPublicMotors, fetchPublicTestimonials, fetchUserProfile, getCurrentUser]);
+    }, [fetchAllMotorsForSliders, fetchPublicTestimonials, fetchUserProfile, getCurrentUser]);
 
-    // Efek untuk memfilter motor berdasarkan tanggal dan lama sewa (akan dipicu oleh kalender)
-    useEffect(() => {
-        if (tanggalSewaInput && parseInt(lamaSewaInput) > 0) {
-            fetchPublicMotors(tanggalSewaInput, lamaSewaInput);
-        } else {
-            // Jika tanggal/lama sewa tidak lengkap/valid, tampilkan semua motor tanpa filter tanggal
-            // fetchPublicMotors(); // Ini akan memuat ulang semua tanpa filter tanggal jika diperlukan
-            setAvailableMotorsFilteredByDate([]); // Kosongkan daftar ini jika filter tidak aktif
-            setSelectedMerk('');
-            setAvailableTipeMotor([]);
-            setCurrentTipeMotor('');
-        }
-    }, [tanggalSewaInput, lamaSewaInput, fetchPublicMotors]);
-
+    // FIXED: Hapus useEffect yang menyebabkan refresh berulang
+    // useEffect untuk memfilter motor berdasarkan tanggal dan lama sewa sudah tidak diperlukan
+    // karena filtering akan dilakukan langsung di handleCalendarDateSelect
 
     // --- SLIDER FUNCTIONS ---
     const nextSlide = (brand) => {
@@ -229,7 +244,7 @@ const Index = () => {
 
     // Get motors for specific brand and slide
     const getMotorsForBrandSlide = (brand, slideIndex) => {
-        const motorsToDisplay = allMotors; // Slider utama selalu menampilkan semua yang fetched
+        const motorsToDisplay = allMotors;
         const brandMotors = motorsToDisplay.filter(m => m.brand === brand && m.status === 'available');
         const startIndex = slideIndex * 3;
         const endIndex = startIndex + 3;
@@ -237,7 +252,7 @@ const Index = () => {
     };
 
     // --- FUNGSI FORM RESERVASI ---
-    const openReservasiPopup = useCallback((merk = '', tipe = '', motorId = null) => { // Tambahkan motorId
+    const openReservasiPopup = useCallback((merk = '', tipe = '', motorId = null) => {
         const user = getCurrentUser();
         if (!user || !user.id) {
             alert('Anda harus login untuk membuat reservasi.');
@@ -247,16 +262,34 @@ const Index = () => {
 
         setReservasiPopupOpen(true);
         document.body.style.overflow = 'hidden';
-        setSelectedMerk(merk);
-        setCurrentTipeMotor(tipe);
-        setSelectedMotorForCalendar(motorId); // Set motor yang dipilih untuk kalender
         
-        const motorOfType = availableMotorsFilteredByDate.filter(m => m.brand === merk);
-        const uniqueTypes = [...new Set(motorOfType.map(m => m.type))];
-        setAvailableTipeMotor(uniqueTypes.filter(t => t));
+        // Set motor untuk kalender
+        setSelectedMotorForCalendar(motorId);
+        
+        // Reset form fields
+        setTanggalSewaInput('');
+        setLamaSewaInput('');
+        setAvailableMotorsFilteredByDate([]);
+        setSelectedMerk('');
+        setAvailableTipeMotor([]);
+        setCurrentTipeMotor('');
 
-    }, [availableMotorsFilteredByDate, getCurrentUser, navigate]);
+        // Set initial data dari allMotors (tanpa filter tanggal)
+        if (motorId) {
+            const motorData = allMotors.find(m => m.id === motorId);
+            if (motorData) {
+                setSelectedMerk(motorData.brand);
+                setCurrentTipeMotor(motorData.type);
+                const brandMotors = allMotors.filter(m => m.brand === motorData.brand);
+                const uniqueTypes = [...new Set(brandMotors.map(m => m.type))];
+                setAvailableTipeMotor(uniqueTypes.filter(t => t));
+            }
+        } else {
+            setSelectedMerk(merk);
+            setCurrentTipeMotor(tipe);
+        }
 
+    }, [allMotors, getCurrentUser, navigate]);
 
     const closeReservasiPopup = () => {
         setReservasiPopupOpen(false);
@@ -267,22 +300,31 @@ const Index = () => {
         setError(null);
         setTanggalSewaInput('');
         setLamaSewaInput('');
-        setSelectedMotorForCalendar(null); // Reset motor untuk kalender
+        setSelectedMotorForCalendar(null);
+        setAvailableMotorsFilteredByDate([]);
     };
 
-    // Handler ketika tanggal dipilih dari kalender
+    // FIXED: Handler ketika tanggal dipilih dari kalender - tidak menyebabkan refresh berulang
     const handleCalendarDateSelect = useCallback((selection) => {
         if (selection) {
+            // FIXED: Update state tanggal dan durasi langsung tanpa trigger useEffect
             setTanggalSewaInput(selection.startDate);
             setLamaSewaInput(selection.duration.toString());
-            // Setelah tanggal dipilih, filter motor berdasarkan tanggal ini
-            // Effect di atas sudah menangani ini: useEffect([tanggalSewaInput, lamaSewaInput])
+            
+            // FIXED: Langsung filter motor berdasarkan pilihan tanggal tanpa menunggu state update
+            if (selectedMotorForCalendar && !isFilteringByDate.current) {
+                fetchFilteredMotorsByDate(selectedMotorForCalendar, selection.startDate, selection.duration);
+            }
         } else {
+            // Reset semua field jika pilihan dihapus
             setTanggalSewaInput('');
             setLamaSewaInput('');
+            setAvailableMotorsFilteredByDate([]);
+            setSelectedMerk('');
+            setAvailableTipeMotor([]);
+            setCurrentTipeMotor('');
         }
-    }, []);
-
+    }, [selectedMotorForCalendar, fetchFilteredMotorsByDate]);
 
     const handleMerkChange = (e) => {
         const merk = e.target.value;
@@ -293,209 +335,190 @@ const Index = () => {
         setCurrentTipeMotor('');
     };
 
-// Fixed handleReservasiSubmit function
-const handleReservasiSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitReservationLoading(true);
-    setError(null);
-    
-    const formData = new FormData(e.target);
-    const data = Object.fromEntries(formData.entries());
-
-    // Debug logging yang lebih detail
-    console.log('=== DEBUG RESERVATION ===');
-    console.log('Form data:', data);
-    console.log('Current user:', currentUser);
-    console.log('All motors:', allMotors);
-    
-    // FIX: Get nama lengkap and no HP from hidden fields or currentUser
-    const namaLengkap = data.namaLengkapHidden || currentUser?.nama_lengkap;
-    const noHp = data.noHpHidden || currentUser?.no_hp;
-    
-    // Validasi required form fields
-    if (!data.merkMotor || !data.tipeMotor || !data.tanggalSewa || !data.lama_sewa || !data.lokasi_jemput) {
-        setError('Mohon lengkapi semua field yang diperlukan untuk reservasi!');
-        setSubmitReservationLoading(false);
-        return;
-    }
-
-    // FIX: Validate user profile data from hidden fields or currentUser state
-    const userId = currentUser?.id;
-    if (!namaLengkap || !noHp || !userId) {
-        let profileError = 'Data profil Anda tidak lengkap.';
-        if (!namaLengkap) profileError += ' (Nama Lengkap missing)';
-        if (!noHp) profileError += ' (Nomor HP missing)';
-        if (!userId) profileError += ' (User ID missing, please re-login or check your profile)';
-        setError(profileError + ' Silakan lengkapi profil Anda terlebih dahulu.');
-        setSubmitReservationLoading(false);
-        navigate('/login'); // Redirect to login or profile update page
-        return;
-    }
-
-    // FIX: Validate numeric fields before proceeding
-    const lamaSewa = parseInt(data.lama_sewa);
-    if (isNaN(lamaSewa) || lamaSewa <= 0) {
-        setError('Lama sewa harus berupa angka yang valid (minimal 1 hari).');
-        setSubmitReservationLoading(false);
-        return;
-    }
-
-    try {
-        // Pastikan motor yang dipilih adalah dari daftar yang tersedia pada tanggal tersebut
-        const selectedMotor = availableMotorsFilteredByDate.find(m => m.brand === data.merkMotor && m.type === data.tipeMotor);
-        console.log('Selected motor:', selectedMotor);
+    // Fixed handleReservasiSubmit function
+    const handleReservasiSubmit = async (e) => {
+        e.preventDefault();
+        setSubmitReservationLoading(true);
+        setError(null);
         
-        if (!selectedMotor) {
-            setError('Motor tidak ditemukan atau tidak tersedia pada tanggal yang dipilih. Silakan pilih motor lain atau sesuaikan tanggal sewa.');
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+
+        console.log('=== DEBUG RESERVATION ===');
+        console.log('Form data:', data);
+        console.log('Current user:', currentUser);
+        console.log('All motors:', allMotors);
+        
+        const namaLengkap = data.namaLengkapHidden || currentUser?.nama_lengkap;
+        const noHp = data.noHpHidden || currentUser?.no_hp;
+        
+        if (!data.merkMotor || !data.tipeMotor || !data.tanggalSewa || !data.lama_sewa || !data.lokasi_jemput) {
+            setError('Mohon lengkapi semua field yang diperlukan untuk reservasi!');
             setSubmitReservationLoading(false);
             return;
         }
 
-        const token = localStorage.getItem('token');
-        // const userId = currentUser?.id; // Already defined and validated above
-
-        console.log('Token:', token ? 'Available' : 'Not found');
-        console.log('User ID (after validation):', userId);
-        console.log('Nama Lengkap:', namaLengkap);
-        console.log('No HP:', noHp);
-
-        if (!token) { // userId is already checked above
-            alert('Anda harus login untuk membuat reservasi.');
+        const userId = currentUser?.id;
+        if (!namaLengkap || !noHp || !userId) {
+            let profileError = 'Data profil Anda tidak lengkap.';
+            if (!namaLengkap) profileError += ' (Nama Lengkap missing)';
+            if (!noHp) profileError += ' (Nomor HP missing)';
+            if (!userId) profileError += ' (User ID missing, please re-login or check your profile)';
+            setError(profileError + ' Silakan lengkapi profil Anda terlebih dahulu.');
+            setSubmitReservationLoading(false);
             navigate('/login');
+            return;
+        }
+
+        const lamaSewa = parseInt(data.lama_sewa);
+        if (isNaN(lamaSewa) || lamaSewa <= 0) {
+            setError('Lama sewa harus berupa angka yang valid (minimal 1 hari).');
             setSubmitReservationLoading(false);
             return;
         }
 
-        // FIX: Validate user ID is a valid number
-        const userIdNumber = parseInt(userId);
-        if (isNaN(userIdNumber)) {
-            setError('ID pengguna tidak valid. Silakan login ulang.');
-            setSubmitReservationLoading(false);
-            return;
-        }
-
-        // FIX: Validate motor ID is a valid number
-        const motorIdNumber = parseInt(selectedMotor.id);
-        if (isNaN(motorIdNumber)) {
-            setError('ID motor tidak valid. Silakan pilih motor yang lain.');
-            setSubmitReservationLoading(false);
-            return;
-        }
-
-        // FIX: Validate and parse motor price properly
-        // Gunakan price dari objek motor yang ditemukan
-        const motorPrice = selectedMotor.price; 
-        const motorPriceNumber = parseFloat(motorPrice);
-        
-        console.log('Motor price raw:', motorPrice);
-        console.log('Motor price parsed:', motorPriceNumber);
-        
-        if (isNaN(motorPriceNumber) || motorPriceNumber <= 0) {
-            setError('Harga motor tidak valid. Silakan pilih motor lain atau hubungi admin.');
-            setSubmitReservationLoading(false);
-            return;
-        }
-
-        // FIX: Calculate total price with proper validation
-        const calculatedTotalHarga = motorPriceNumber * lamaSewa;
-        console.log('Calculated total harga:', calculatedTotalHarga);
-        
-        if (isNaN(calculatedTotalHarga) || calculatedTotalHarga <= 0) {
-            setError('Total harga tidak dapat dihitung. Silakan periksa data motor dan lama sewa.');
-            setSubmitReservationLoading(false);
-            return;
-        }
-
-        // FIX: Validate date format
-        const tanggalMulaiDateObj = new Date(data.tanggalSewa);
-        if (isNaN(tanggalMulaiDateObj.getTime())) {
-            setError('Tanggal sewa tidak valid. Silakan pilih tanggal yang benar.');
-            setSubmitReservationLoading(false);
-            return;
-        }
-
-        // Hitung tanggal selesai
-        const tanggalSelesaiDateObj = new Date(tanggalMulaiDateObj);
-        tanggalSelesaiDateObj.setDate(tanggalSelesaiDateObj.getDate() + lamaSewa);
-
-        // Format tanggal keリエステル-MM-DD
-        const tanggalMulaiFormatted = tanggalMulaiDateObj.toISOString().split('T')[0];
-        const tanggalSelesaiFormatted = tanggalSelesaiDateObj.toISOString().split('T')[0];
-
-        // FIX: Create payload with validated data
-        const payload = {
-            user_id: userIdNumber,
-            motor_id: motorIdNumber,
-            tanggal_mulai: tanggalMulaiFormatted,
-            tanggal_selesai: tanggalSelesaiFormatted,
-            lama_sewa: lamaSewa,
-            lokasi_jemput: data.lokasi_jemput.trim(),
-            total_harga: calculatedTotalHarga,
-            catatan: data.catatanReservasi?.trim() || null
-        };
-        
-        console.log('Final payload to send:', payload);
-        
-        // FIX: Validate all payload fields before sending
-        if (isNaN(payload.user_id) || isNaN(payload.motor_id) || isNaN(payload.lama_sewa) || isNaN(payload.total_harga)) {
-            setError('Ada data yang tidak valid. Silakan periksa kembali form reservasi.');
-            setSubmitReservationLoading(false);
-            return;
-        }
-        
-        console.log('API URL:', `${getApiUrl()}/api/reservations`);
-
-        const response = await axios.post(`${getApiUrl()}/api/reservations`, payload, {
-            headers: { 
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json'
+        try {
+            const selectedMotor = availableMotorsFilteredByDate.find(m => m.brand === data.merkMotor && m.type === data.tipeMotor);
+            console.log('Selected motor:', selectedMotor);
+            
+            if (!selectedMotor) {
+                setError('Motor tidak ditemukan atau tidak tersedia pada tanggal yang dipilih. Silakan pilih motor lain atau sesuaikan tanggal sewa.');
+                setSubmitReservationLoading(false);
+                return;
             }
-        });
 
-        console.log('Success response:', response.data);
-        alert(response.data.message || 'Reservasi berhasil dibuat!');
-        
-        const reservationId = response.data.reservationId || response.data.data?.id || response.data.id;
-        const totalHargaReservasi = calculatedTotalHarga; // Kirim total harga yang sudah dihitung
+            const token = localStorage.getItem('token');
 
-        // Tutup popup sebelum navigasi
-        closeReservasiPopup(); 
-        
-        navigate('/pembayaran', { 
-            state: { 
-                reservationId: reservationId, 
-                totalHarga: totalHargaReservasi,
-                // Kirim juga detail lain jika Pembayaran.jsx membutuhkannya
-                reservasiData: payload // Kirim seluruh payload jika diperlukan
-            } 
-        });
-        
-    } catch (err) {
-        console.error('=== ERROR DETAILS ===');
-        console.error('Full error object:', err);
-        console.error('Error message:', err.message);
-        console.error('Error response status:', err.response?.status);
-        console.error('Error response data:', err.response?.data);
-        console.error('Error response headers:', err.response?.headers);
-        console.error('Request config:', err.config);
-        
-        // Show detailed error message
-        let errorMessage = 'Gagal membuat reservasi: ';
-        if (err.response?.data?.message) {
-            errorMessage += err.response.data.message;
-        } else if (err.response?.data?.error) {
-            errorMessage += err.response.data.error;
-        } else if (err.response?.data) {
-            errorMessage += JSON.stringify(err.response.data);
-        } else {
-            errorMessage += err.message;
+            console.log('Token:', token ? 'Available' : 'Not found');
+            console.log('User ID (after validation):', userId);
+            console.log('Nama Lengkap:', namaLengkap);
+            console.log('No HP:', noHp);
+
+            if (!token) {
+                alert('Anda harus login untuk membuat reservasi.');
+                navigate('/login');
+                setSubmitReservationLoading(false);
+                return;
+            }
+
+            const userIdNumber = parseInt(userId);
+            if (isNaN(userIdNumber)) {
+                setError('ID pengguna tidak valid. Silakan login ulang.');
+                setSubmitReservationLoading(false);
+                return;
+            }
+
+            const motorIdNumber = parseInt(selectedMotor.id);
+            if (isNaN(motorIdNumber)) {
+                setError('ID motor tidak valid. Silakan pilih motor yang lain.');
+                setSubmitReservationLoading(false);
+                return;
+            }
+
+            const motorPrice = selectedMotor.price; 
+            const motorPriceNumber = parseFloat(motorPrice);
+            
+            console.log('Motor price raw:', motorPrice);
+            console.log('Motor price parsed:', motorPriceNumber);
+            
+            if (isNaN(motorPriceNumber) || motorPriceNumber <= 0) {
+                setError('Harga motor tidak valid. Silakan pilih motor lain atau hubungi admin.');
+                setSubmitReservationLoading(false);
+                return;
+            }
+
+            const calculatedTotalHarga = motorPriceNumber * lamaSewa;
+            console.log('Calculated total harga:', calculatedTotalHarga);
+            
+            if (isNaN(calculatedTotalHarga) || calculatedTotalHarga <= 0) {
+                setError('Total harga tidak dapat dihitung. Silakan periksa data motor dan lama sewa.');
+                setSubmitReservationLoading(false);
+                return;
+            }
+
+            const tanggalMulaiDateObj = new Date(data.tanggalSewa);
+            if (isNaN(tanggalMulaiDateObj.getTime())) {
+                setError('Tanggal sewa tidak valid. Silakan pilih tanggal yang benar.');
+                setSubmitReservationLoading(false);
+                return;
+            }
+
+            const tanggalSelesaiDateObj = new Date(tanggalMulaiDateObj);
+            tanggalSelesaiDateObj.setDate(tanggalSelesaiDateObj.getDate() + lamaSewa);
+
+            const tanggalMulaiFormatted = tanggalMulaiDateObj.toISOString().split('T')[0];
+            const tanggalSelesaiFormatted = tanggalSelesaiDateObj.toISOString().split('T')[0];
+
+            const payload = {
+                user_id: userIdNumber,
+                motor_id: motorIdNumber,
+                tanggal_mulai: tanggalMulaiFormatted,
+                tanggal_selesai: tanggalSelesaiFormatted,
+                lama_sewa: lamaSewa,
+                lokasi_jemput: data.lokasi_jemput.trim(),
+                total_harga: calculatedTotalHarga,
+                catatan: data.catatanReservasi?.trim() || null
+            };
+            
+            console.log('Final payload to send:', payload);
+            
+            if (isNaN(payload.user_id) || isNaN(payload.motor_id) || isNaN(payload.lama_sewa) || isNaN(payload.total_harga)) {
+                setError('Ada data yang tidak valid. Silakan periksa kembali form reservasi.');
+                setSubmitReservationLoading(false);
+                return;
+            }
+            
+            console.log('API URL:', `${getApiUrl()}/api/reservations`);
+
+            const response = await axios.post(`${getApiUrl()}/api/reservations`, payload, {
+                headers: { 
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            console.log('Success response:', response.data);
+            alert(response.data.message || 'Reservasi berhasil dibuat!');
+            
+            const reservationId = response.data.reservationId || response.data.data?.id || response.data.id;
+            const totalHargaReservasi = calculatedTotalHarga;
+
+            closeReservasiPopup(); 
+            
+            navigate('/pembayaran', { 
+                state: { 
+                    reservationId: reservationId, 
+                    totalHarga: totalHargaReservasi,
+                    reservasiData: payload
+                } 
+            });
+            
+        } catch (err) {
+            console.error('=== ERROR DETAILS ===');
+            console.error('Full error object:', err);
+            console.error('Error message:', err.message);
+            console.error('Error response status:', err.response?.status);
+            console.error('Error response data:', err.response?.data);
+            console.error('Error response headers:', err.response?.headers);
+            console.error('Request config:', err.config);
+            
+            let errorMessage = 'Gagal membuat reservasi: ';
+            if (err.response?.data?.message) {
+                errorMessage += err.response.data.message;
+            } else if (err.response?.data?.error) {
+                errorMessage += err.response.data.error;
+            } else if (err.response?.data) {
+                errorMessage += JSON.stringify(err.response.data);
+            } else {
+                errorMessage += err.message;
+            }
+            
+            setError(errorMessage);
+        } finally {
+            setSubmitReservationLoading(false);
         }
-        
-        setError(errorMessage);
-    } finally {
-        setSubmitReservationLoading(false);
-    }
-};
+    };
+
     // --- FUNGSI FORM TESTIMONI ---
     const handleCommentChange = (e) => {
         setCommentText(e.target.value);
@@ -559,7 +582,6 @@ const handleReservasiSubmit = async (e) => {
         return brands.filter(brand => brand);
     }, [allMotors]);
 
-    // Fix: Use correct field name 'price' from database
     const formatPrice = (price) => {
         return `Rp ${parseFloat(price).toLocaleString('id-ID')}/hari`;
     };
@@ -646,12 +668,12 @@ const handleReservasiSubmit = async (e) => {
                                                             {getMotorsForBrandSlide(brand, slideIndex).map(motor => (
                                                                 <MotorCard 
                                                                     key={motor.id}
-                                                                    motorId={motor.id} // Tambahkan motorId
+                                                                    motorId={motor.id} 
                                                                     brand={motor.brand} 
                                                                     type={motor.type} 
                                                                     price={formatPrice(motor.price)}
                                                                     specs={motor.specs}
-                                                                    gambar_motor={motor.gambar_motor} // TAMBAHKAN INI - field gambar dari database
+                                                                    gambar_motor={motor.gambar_motor}
                                                                     openReservasiPopup={() => openReservasiPopup(motor.brand, motor.type, motor.id)} 
                                                                 />
                                                             ))}
@@ -801,7 +823,7 @@ const handleReservasiSubmit = async (e) => {
                     ) : (
                         <div id="successMessage" className="success-message" style={{ display: 'block' }}>
                             <div className="success-icon">✓</div>
-                            <h3>Terima Kasih!</h3>
+                            <h3>Terima Terima kasih!</h3>
                             <p>Testimoni Anda telah berhasil dikirim dan akan ditampilkan setelah diverifikasi.</p>
                             <button type="button" className="btn-secondary" onClick={resetTestimonialForm}>Tulis Testimoni Lagi</button>
                         </div>
@@ -850,7 +872,7 @@ const handleReservasiSubmit = async (e) => {
                             <button className="close-btn" onClick={closeReservasiPopup}>&times;</button>
                         </div>
                         <form id="reservasiForm" className="popup-form" onSubmit={handleReservasiSubmit}>
-                            {/* Input Tanggal dan Lama Sewa */}
+                            {/* Pilihan Motor */}
                             <div className="form-group">
                                 <label>Pilih Motor:</label>
                                 <select 
@@ -888,6 +910,7 @@ const handleReservasiSubmit = async (e) => {
                                 </div>
                             )}
 
+                            {/* Tanggal Mulai & Lama Sewa (akan diisi dari kalender) */}
                             <div className="form-group">
                                 <label>Tanggal Mulai Sewa:</label>
                                 <input 
@@ -897,7 +920,7 @@ const handleReservasiSubmit = async (e) => {
                                     value={tanggalSewaInput}
                                     onChange={(e) => setTanggalSewaInput(e.target.value)}
                                     required 
-                                    readOnly={!!selectedMotorForCalendar} // Readonly jika motor dipilih dan diatur dari kalender
+                                    readOnly={true} // Selalu readOnly karena diisi kalender
                                     disabled={submitReservationLoading || !selectedMotorForCalendar}
                                     style={{ 
                                         backgroundColor: selectedMotorForCalendar ? '#e9ecef' : '', 
@@ -906,36 +929,35 @@ const handleReservasiSubmit = async (e) => {
                                 />
                             </div>
                             <div className="form-group">
-                                <label>Lama Sewa (hari):</label>
-                                <input 
-                                    type="number" 
-                                    id="lama_sewa" 
-                                    name="lama_sewa" 
-                                    min="1" 
-                                    placeholder="1" 
-                                    value={lamaSewaInput}
-                                    onChange={(e) => setLamaSewaInput(e.target.value)}
-                                    required 
-                                    readOnly={!!selectedMotorForCalendar} // Readonly jika motor dipilih dan diatur dari kalender
-                                    disabled={submitReservationLoading || !selectedMotorForCalendar}
-                                    style={{ 
-                                        backgroundColor: selectedMotorForCalendar ? '#e9ecef' : '', 
-                                        cursor: selectedMotorForCalendar ? 'not-allowed' : 'auto' 
-                                    }}
-                                />
-                            </div>
+                            <label htmlFor="lama_sewa">Lama Sewa (Hari)</label>
+                            <input
+                                type="number"
+                                id="lama_sewa"
+                                name="lama_sewa"
+                                value={lamaSewaInput}
+                                disabled={true}  // Disabled karena diatur oleh kalender
+                                placeholder="Pilih tanggal di kalender untuk menentukan lama sewa"
+                                className="form-control disabled-field"
+                                style={{
+                                    backgroundColor: '#f5f5f5',
+                                    cursor: 'not-allowed',
+                                    color: '#666'
+                                }}
+                            />
+                            <small className="form-text text-muted">
+                                Lama sewa akan otomatis terisi sesuai dengan rentang tanggal yang Anda pilih di kalender
+                            </small>
+                        </div>
 
+                            {/* Merk & Tipe Motor (akan diisi otomatis setelah tanggal dipilih) */}
                             <div className="form-group">
                                 <label>Merk Motor:</label>
                                 <select id="merkMotor" name="merkMotor" value={selectedMerk} onChange={handleMerkChange} disabled={submitReservationLoading || !availableMotorsFilteredByDate.length || !tanggalSewaInput || !lamaSewaInput}>
                                     <option value="">Pilih Merk</option>
-                                    {/* Gunakan motor yang difilter tanggal untuk opsi merk */}
-                                    {/* Pastikan hanya merk dari motor yang tersedia pada tanggal yang dipilih */}
-                                    {[...new Set(availableMotorsFilteredByDate.map(m => m.brand))].filter(b => b).map(brand => (
-                                        <option key={brand} value={brand}>{brand}</option>
-                                    ))}
+                                    {availableMotorsFilteredByDate.map(motor => motor.id === selectedMotorForCalendar ? (
+                                        <option key={motor.id} value={motor.brand}>{motor.brand}</option>
+                                    ) : null)}
                                 </select>
-                                {/* Pesan jika tidak ada motor tersedia setelah filter tanggal */}
                                 {tanggalSewaInput && parseInt(lamaSewaInput) > 0 && availableMotorsFilteredByDate.length === 0 && (
                                     <small style={{ color: 'red', fontSize: '12px' }}>
                                         Tidak ada motor tersedia pada rentang tanggal ini.
@@ -956,6 +978,8 @@ const handleReservasiSubmit = async (e) => {
                                     ))}
                                 </select>
                             </div>
+                            
+                            {/* Data User & Lokasi Jemput */}
                             <div className="form-group">
                                 <label>Nama Lengkap:</label>
                                 <input 
@@ -972,12 +996,7 @@ const handleReservasiSubmit = async (e) => {
                                         color: '#666'
                                     }}
                                 />
-                                {/* Hidden input untuk memastikan data terkirim */}
-                                <input 
-                                    type="hidden" 
-                                    name="namaLengkapHidden" 
-                                    value={currentUser?.nama_lengkap || ''} 
-                                />
+                                <input type="hidden" name="namaLengkapHidden" value={currentUser?.nama_lengkap || ''} />
                                 <small style={{ color: '#666', fontSize: '12px' }}>
                                     * Data ini diambil dari profil akun Anda
                                     {!currentUser?.nama_lengkap && 
@@ -1002,12 +1021,7 @@ const handleReservasiSubmit = async (e) => {
                                         color: '#666'
                                     }}
                                 />
-                                {/* Hidden input untuk memastikan data terkirim */}
-                                <input 
-                                    type="hidden" 
-                                    name="noHpHidden" 
-                                    value={currentUser?.no_hp || ''} 
-                                />
+                                <input type="hidden" name="noHpHidden" value={currentUser?.no_hp || ''} />
                                 <small style={{ color: '#666', fontSize: '12px' }}>
                                     * Data ini diambil dari profil akun Anda
                                     {!currentUser?.no_hp && 

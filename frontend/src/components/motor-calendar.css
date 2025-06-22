@@ -116,11 +116,10 @@
 }
 
 .calendar-day-selected {
-    background: #007bff !important;
-    color: white !important;
-    border-color: #0056b3 !important;
-    font-weight: 600;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+    background-color: var(--primary-color); /* Asumsi primary-color di global.css */
+    color: var(--white);
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-sm);
 }
 
 .calendar-day-reserved {
