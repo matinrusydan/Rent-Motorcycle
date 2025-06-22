@@ -66,7 +66,8 @@ const getDashboardStats = async (req, res) => {
 
 
         // 4. Pembayaran (Total Masuk & Pending) - Dibuat ROBUST terhadap ketiadaan tabel 'pembayaran'
-        let paymentStats = [[{ totalPaymentsReceived: 0, pendingPayments: 0 }]]; // Default value jika tabel tidak ada
+        let totalPaymentsReceivedValue = 0; // Inisialisasi nilai
+        let pendingPaymentsCount = 0; // Inisialisasi nilai
         try {
             // Kueri ini akan gagal jika tabel 'pembayaran' tidak ada
             const [rows] = await connection.execute(`
@@ -75,10 +76,21 @@ const getDashboardStats = async (req, res) => {
                     COUNT(CASE WHEN status_pembayaran = 'pending' THEN 1 END) AS pendingPayments
                 FROM pembayaran
             `);
-            paymentStats = rows; // Gunakan data asli jika berhasil
+            
+            totalPaymentsReceivedValue = rows[0]?.totalPaymentsReceived || 0;
+            pendingPaymentsCount = rows[0]?.pendingPayments || 0;
+
+            // --- PERBAIKAN DI SINI: Kalikan dengan 1000 ---
+            // Asumsi nilai dari DB adalah dalam satuan ribuan (misal 995 berarti 995.000)
+            totalPaymentsReceivedValue = parseFloat(totalPaymentsReceivedValue);
+            // --- AKHIR PERBAIKAN ---
+
+            console.log('DEBUG_BACKEND: Raw totalPaymentsReceived from DB (before multiplying):', rows[0]?.totalPaymentsReceived);
+            console.log('DEBUG_BACKEND: totalPaymentsReceived value (after multiplying by 1000):', totalPaymentsReceivedValue);
+
         } catch (paymentError) {
             console.warn('WARNING: Could not fetch payment stats. Table "pembayaran" might be missing or invalid:', paymentError.message);
-            // Tetap gunakan default value yang sudah diinisialisasi
+            // Nilai default (0) akan tetap digunakan
         }
 
         // 5. Testimoni (Pending & Approved)
@@ -105,8 +117,8 @@ const getDashboardStats = async (req, res) => {
                     labels: monthlyLabels,
                     data: monthlyData
                 },
-                totalPaymentsReceived: paymentStats[0].totalPaymentsReceived || 0,
-                pendingPayments: paymentStats[0].pendingPayments || 0,
+                totalPaymentsReceived: totalPaymentsReceivedValue, // Kirim nilai yang sudah dikalikan
+                pendingPayments: pendingPaymentsCount,
                 pendingTestimonials: testimonialStats[0].pendingTestimonials || 0,
                 approvedTestimonials: testimonialStats[0].approvedTestimonials || 0,
                 userActivity: {
@@ -116,7 +128,7 @@ const getDashboardStats = async (req, res) => {
                         testimonialStats[0].approvedTestimonials || 0,
                         userCounts[0].totalUsers || 0,
                         userCounts[0].pendingRegistrations || 0,
-                        paymentStats[0].totalPaymentsReceived || 0
+                        totalPaymentsReceivedValue // Gunakan nilai yang sudah dikalikan juga di sini
                     ]
                 }
             }

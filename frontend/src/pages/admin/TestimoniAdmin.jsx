@@ -1,23 +1,19 @@
 // frontend/src/pages/admin/TestimoniAdmin.jsx
 
-import React, { useState, useEffect, useCallback } from 'react'; // Pastikan semua Hooks diimpor
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios'; // Pastikan Axios diimpor
+import axios from 'axios';
 import Sidebar from '../../components/admin/Sidebar.jsx';
-// Jika Anda tidak menggunakan Footer di layout admin ini, jangan diimpor/digunakan
-// import Footer from '../../components/Footer.jsx'; 
 
 // CSS yang relevan
-import '../../assets/css/admin/dashboard.css'; // Untuk gaya admin umum
-import '../../assets/css/admin/sidebar.css'; // Untuk gaya sidebar
-// Anda mungkin juga perlu CSS khusus testimoni admin jika ada
-// import '../../assets/css/admin/testimoniadmin.css'; // Contoh jika ada gaya khusus
-import '../../assets/css/global.css'; // Gaya global
+import '../../assets/css/admin/dashboard.css';
+import '../../assets/css/admin/sidebar.css';
+import '../../assets/css/global.css';
 
 const TestimoniAdmin = () => {
-    // State untuk daftar testimoni (data akan diambil dari backend)
-    const [testimonials, setTestimonials] = useState([]); // Hapus dummy data
-    const [loading, setLoading] = useState(true); // State untuk loading
+    // State untuk daftar testimoni
+    const [testimonials, setTestimonials] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [refreshTrigger, setRefreshTrigger] = useState(0); // Untuk memicu refresh data
@@ -28,7 +24,7 @@ const TestimoniAdmin = () => {
         return import.meta.env.VITE_APP_API_URL || 'http://localhost:5000';
     };
 
-    // === START: Fungsionalitas SIDEBAR (Disalin dari ReservasiAdmin.jsx) ===
+    // === START: Fungsionalitas SIDEBAR ===
     const [isSidebarToggled, setIsSidebarToggled] = useState(false);
 
     useEffect(() => {
@@ -47,13 +43,15 @@ const TestimoniAdmin = () => {
             window.removeEventListener('resize', handleResize);
         };
     }, [isSidebarToggled]);
+    // === END: Fungsionalitas SIDEBAR ===
+
     // === START: FUNGSI UNTUK MENGAMBIL DATA TESTIMONI DARI BACKEND ===
     const fetchTestimonials = useCallback(async () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
             if (!token) {
-                alert('Sesi Anda berakhir, silakan login kembali.');
+                alert('Your session has expired, please log in again.');
                 navigate('/login');
                 setLoading(false);
                 return;
@@ -69,8 +67,8 @@ const TestimoniAdmin = () => {
             setTestimonials(response.data.data);
         } catch (error) {
             console.error('Error fetching testimonials:', error);
-            const errorMessage = error.response?.data?.message || error.message || 'Terjadi kesalahan tidak dikenal.';
-            alert(`Gagal memuat data testimoni: ${errorMessage}. Pastikan Anda login sebagai admin.`);
+            const errorMessage = error.response?.data?.message || error.message || 'An unknown error occurred.';
+            alert(`Failed to load testimonial data: ${errorMessage}. Please ensure you are logged in as an admin.`);
             if (error.response?.status === 401 || error.response?.status === 403) {
                 navigate('/login');
             }
@@ -113,11 +111,12 @@ const TestimoniAdmin = () => {
         try {
             const token = localStorage.getItem('token');
             if (!token) {
-                alert('Sesi Anda berakhir, silakan login kembali.');
+                alert('Your session has expired, please log in again.');
                 navigate('/login');
                 return;
             }
-            if (!confirm(`Apakah Anda yakin ingin mengubah status testimoni ini menjadi ${newStatus}?`)) {
+            // Menggunakan window.confirm untuk konfirmasi penghapusan
+            if (!window.confirm(`Are you sure you want to change the status of this testimonial to ${newStatus}?`)) {
                 return;
             }
 
@@ -131,8 +130,36 @@ const TestimoniAdmin = () => {
             setRefreshTrigger(prev => prev + 1); // Memicu pengambilan ulang data
         } catch (error) {
             console.error('Error changing testimonial status:', error);
-            const errorMessage = error.response?.data?.message || error.message || 'Terjadi kesalahan tidak dikenal.';
-            alert(`Gagal mengubah status testimoni: ${errorMessage}.`);
+            const errorMessage = error.response?.data?.message || error.message || 'An unknown error occurred.';
+            alert(`Failed to change testimonial status: ${errorMessage}.`);
+        }
+    };
+
+    // Fungsi baru: Menghapus testimoni
+    const handleDeleteTestimonial = async (id) => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('Your session has expired, please log in again.');
+                navigate('/login');
+                return;
+            }
+            // Menggunakan window.confirm untuk konfirmasi penghapusan
+            if (!window.confirm('Are you sure you want to delete this testimonial?')) {
+                return;
+            }
+
+            // Panggil API DELETE untuk menghapus testimoni
+            const response = await axios.delete(`${getApiUrl()}/api/admin/testimonials/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            alert(response.data.message);
+            setRefreshTrigger(prev => prev + 1); // Memicu pengambilan ulang data
+        } catch (error) {
+            console.error('Error deleting testimonial:', error);
+            const errorMessage = error.response?.data?.message || error.message || 'An unknown error occurred.';
+            alert(`Failed to delete testimonial: ${errorMessage}.`);
         }
     };
 
@@ -164,11 +191,9 @@ const TestimoniAdmin = () => {
                     <div id="content">
                         <div className="loading-container">
                             <div className="loading-spinner">⏳</div>
-                            <p>Memuat data testimoni...</p>
+                            <p>Loading testimonial data...</p>
                         </div>
                     </div>
-                    {/* Footer juga di sini untuk tampilan loading jika Anda menggunakan komponen Footer */}
-                    {/* <Footer /> */}
                 </div>
             </div>
         );
@@ -182,7 +207,7 @@ const TestimoniAdmin = () => {
                 <div id="content">
                     <div className="container-fluid">
                         <div className="d-sm-flex align-items-center justify-content-between mb-4">
-                            <h1 className="h3 mb-0 text-gray-800">Manajemen Testimoni</h1>
+                            <h1 className="h3 mb-0 text-gray-800">Testimonial Management</h1>
                         </div>
 
                         {/* Filter dan Search */}
@@ -192,7 +217,7 @@ const TestimoniAdmin = () => {
                                     <div className="search-group">
                                         <input
                                             type="text"
-                                            placeholder="Cari nama atau isi testimoni..."
+                                            placeholder="Search name or testimonial content..."
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
                                             className="form-control"
@@ -204,10 +229,10 @@ const TestimoniAdmin = () => {
                                             onChange={(e) => setFilterStatus(e.target.value)}
                                             className="form-select"
                                         >
-                                            <option value="all">Semua Status</option>
-                                            <option value="pending">Menunggu</option>
-                                            <option value="approved">Disetujui</option>
-                                            <option value="rejected">Ditolak</option>
+                                            <option value="all">All Status</option>
+                                            <option value="pending">Pending</option>
+                                            <option value="approved">Approved</option>
+                                            <option value="rejected">Rejected</option>
                                         </select>
                                     </div>
                                 </div>
@@ -217,7 +242,7 @@ const TestimoniAdmin = () => {
                         {/* Tabel Testimoni */}
                         <div className="card shadow mb-4">
                             <div className="card-header py-3">
-                                <h6 className="m-0 font-weight-bold text-primary">Daftar Testimoni</h6>
+                                <h6 className="m-0 font-weight-bold text-primary">Testimonial List</h6>
                             </div>
                             <div className="card-body">
                                 <div className="table-responsive">
@@ -225,12 +250,12 @@ const TestimoniAdmin = () => {
                                         <thead>
                                             <tr>
                                                 <th>ID</th>
-                                                <th>Nama</th>
-                                                <th>Isi Testimoni</th>
+                                                <th>Name</th>
+                                                <th>Testimonial Content</th>
                                                 <th>Rating</th>
-                                                <th>Tanggal</th>
+                                                <th>Date</th>
                                                 <th>Status</th>
-                                                <th>Aksi</th>
+                                                <th>Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -242,13 +267,13 @@ const TestimoniAdmin = () => {
                                                             <td>{t.id}</td>
                                                             <td>
                                                                 <div className="customer-info">
-                                                                    <div className="customer-name">{t.user_nama_lengkap}</div> {/* Asumsi dari backend */}
-                                                                    <div className="customer-email text-muted">{t.user_email}</div> {/* Asumsi dari backend */}
+                                                                    <div className="customer-name">{t.user_nama_lengkap}</div>
+                                                                    <div className="customer-email text-muted">{t.user_email}</div>
                                                                 </div>
                                                             </td>
                                                             <td>{t.content}</td>
-                                                            <td>{'⭐'.repeat(t.rating)}</td> {/* Rating dari backend adalah angka */}
-                                                            <td>{formatDate(t.created_at)}</td> {/* Tanggal dibuat */}
+                                                            <td>{'⭐'.repeat(t.rating)}</td>
+                                                            <td>{formatDate(t.created_at)}</td>
                                                             <td>
                                                                 <span className={statusBadge.class}>
                                                                     {statusBadge.text}
@@ -261,25 +286,23 @@ const TestimoniAdmin = () => {
                                                                             className="btn btn-success btn-sm me-2"
                                                                             onClick={() => handleStatusChange(t.id, 'approved')}
                                                                         >
-                                                                            Setujui
+                                                                            Approve
                                                                         </button>
                                                                         <button
                                                                             className="btn btn-danger btn-sm"
                                                                             onClick={() => handleStatusChange(t.id, 'rejected')}
                                                                         >
-                                                                            Tolak
+                                                                            Reject
                                                                         </button>
                                                                     </>
                                                                 )}
-                                                                {/* Tambahkan tombol untuk melihat detail atau menghapus jika diperlukan untuk status lain */}
-                                                                {t.status.toLowerCase() !== 'pending' && (
-                                                                    <button
-                                                                        className="btn btn-secondary btn-sm"
-                                                                        onClick={() => { /* Tambahkan logika hapus testimoni jika diperlukan */ alert('Fitur hapus belum diimplementasikan.'); }}
-                                                                    >
-                                                                        Hapus
-                                                                    </button>
-                                                                )}
+                                                                {/* Tombol Hapus: Selalu muncul, atau hanya jika status bukan 'pending' */}
+                                                                <button
+                                                                    className="btn btn-danger btn-sm ms-2" // ms-2 for margin-left
+                                                                    onClick={() => handleDeleteTestimonial(t.id)}
+                                                                >
+                                                                    Delete
+                                                                </button>
                                                             </td>
                                                         </tr>
                                                     );
@@ -287,7 +310,7 @@ const TestimoniAdmin = () => {
                                             ) : (
                                                 <tr>
                                                     <td colSpan="7" className="text-center">
-                                                        {loading ? 'Memuat data...' : 'Tidak ada data testimoni.'}
+                                                        {loading ? 'Loading data...' : 'No testimonial data.'}
                                                     </td>
                                                 </tr>
                                             )}
@@ -298,7 +321,7 @@ const TestimoniAdmin = () => {
                         </div>
                     </div>
                 </div>
-                 {/* Footer Admin (Sama seperti yang ada di ReservasiAdmin.jsx) */}
+                 {/* Footer Admin */}
                  <footer className="sticky-footer bg-white">
                     <div className="container my-auto">
                         <div className="copyright text-center my-auto">
@@ -307,9 +330,6 @@ const TestimoniAdmin = () => {
                     </div>
                 </footer>
             </div>
-            {/* Scroll to Top Button dan Logout Modal perlu diletakkan di layout utama Admin jika menggunakan AdminLayout */}
-            {/* Untuk saat ini, modal logout masih perlu diletakkan di sini jika tidak ada AdminLayout */}
-            {/* Contoh Logout Modal (perlu ada di AdminLayout atau App.jsx untuk diakses dari mana saja) */}
         </div>
     );
 };

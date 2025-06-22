@@ -409,7 +409,6 @@ const Motor = () => {
                                             >
                                                 <option value="all">Semua Status</option>
                                                 <option value="available">Tersedia</option>
-                                                <option value="rented">Disewa</option>
                                                 <option value="maintenance">Maintenance</option>
                                             </select>
                                         </div>
@@ -697,7 +696,6 @@ const Motor = () => {
                                         className="form-select" 
                                     >
                                         <option value="available">Tersedia</option>
-                                        <option value="rented">Disewa</option>
                                         <option value="maintenance">Maintenance</option>
                                     </select>
                                 </div>

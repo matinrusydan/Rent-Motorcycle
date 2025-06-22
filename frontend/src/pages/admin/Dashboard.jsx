@@ -24,7 +24,6 @@ const DashboardAdmin = () => {
         monthlyReservations: { labels: [], data: [] },
         totalPaymentsReceived: 0,
         pendingPayments: 0,
-        pendingTestimonials: 0,
         approvedTestimonials: 0,
         userActivity: { labels: [], data: [] }
     });
@@ -86,7 +85,9 @@ const DashboardAdmin = () => {
                 timeout: 20000 // Timeout lebih lama untuk aggregated stats
             });
             
-            // Axios secara otomatis mem-parse JSON dan menangani response.ok
+            console.log('DEBUG_FRONTEND: Raw API response data:', response.data); 
+            console.log('DEBUG_FRONTEND: totalPaymentsReceived from API:', response.data.data.totalPaymentsReceived); 
+
             setDashboardStats(response.data.data);
         } catch (err) {
             console.error('Error fetching dashboard stats:', err);
@@ -134,6 +135,14 @@ const DashboardAdmin = () => {
     useEffect(() => {
         fetchDashboardStats();
     }, [fetchDashboardStats]);
+
+    // Logging state setelah update
+    useEffect(() => {
+        if (!loadingStats && !error) { 
+            console.log('DEBUG_FRONTEND: dashboardStats state updated:', dashboardStats);
+            console.log('DEBUG_FRONTEND: totalPaymentsReceived in state (formatted by formatCurrency):', formatCurrency(dashboardStats.totalPaymentsReceived));
+        }
+    }, [dashboardStats, loadingStats, error]);
 
 
     // Inisialisasi Chart.js dan Animasi Angka
@@ -238,12 +247,20 @@ const DashboardAdmin = () => {
             const numberElements = document.querySelectorAll('.h5.mb-0.font-weight-bold.text-gray-800');
         
             numberElements.forEach(element => {
+                // Periksa apakah ini elemen "Pembayaran Masuk"
+                // Untuk Pembayaran Masuk, langsung set teks yang sudah diformat
+                // Ini menghindari animasi yang dapat merusak format Rupiah yang sudah benar
+                if (element.id === 'totalPayments') {
+                    element.textContent = formatCurrency(dashboardStats.totalPaymentsReceived);
+                    return; 
+                }
+
+                // Untuk elemen angka lainnya, lanjutkan animasi
                 const textContent = element.textContent;
-                const isCurrency = textContent.includes('Rp');
-                // Extract only numeric part, remove commas if any
-                const targetValue = parseFloat(textContent.replace(/[^0-9.-]+/g,"")); // Allows for decimal points too
+                // Hapus semua non-digit kecuali titik atau koma yang digunakan untuk desimal
+                const targetValue = parseFloat(textContent.replace(/[^0-9.,-]+/g,"").replace(/\./g, '').replace(/,/g, '.')); 
                 
-                if (isNaN(targetValue)) return; // Skip if not a valid number
+                if (isNaN(targetValue)) return; 
         
                 let start = 0;
                 const duration = 1000; // ms
@@ -253,18 +270,13 @@ const DashboardAdmin = () => {
                     const progress = Math.min((currentTime - startTime) / duration, 1);
                     const animatedValue = progress * targetValue;
         
-                    if (isCurrency) {
-                        // Format as currency, ensuring integer for intermediate steps for cleaner animation
-                        element.textContent = 'Rp ' + Math.floor(animatedValue).toLocaleString('id-ID');
-                    } else {
-                        element.textContent = Math.floor(animatedValue);
-                    }
+                    element.textContent = Math.floor(animatedValue).toLocaleString('id-ID'); // Format sebagai angka bulat dengan pemisah ribuan
         
                     if (progress < 1) {
                         requestAnimationFrame(step);
                     } else {
-                        // Ensure final value is exactly the target value, formatted correctly
-                        element.textContent = isCurrency ? 'Rp ' + targetValue.toLocaleString('id-ID') : targetValue.toLocaleString('id-ID');
+                        // Pastikan nilai akhir adalah nilai target yang diformat dengan benar
+                        element.textContent = targetValue.toLocaleString('id-ID'); 
                     }
                 };
         
@@ -291,13 +303,11 @@ const DashboardAdmin = () => {
 
         // Gunakan Intl.NumberFormat dengan minimumFractionDigits: 0
         // Ini akan memformat seperti 340.000, 1.250.000
-        // TIDAK akan menambahkan ,00 di belakang jika angkanya bulat
-        // Jika Anda ingin SELALU ada dua angka di belakang koma (misal 340.000,00), ubah menjadi minimumFractionDigits: 2
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
             currency: 'IDR',
-            minimumFractionDigits: 0, // << Ini memastikan tidak ada koma jika tidak ada desimal
-            maximumFractionDigits: 0  // << Ini memastikan tidak ada koma jika tidak ada desimal
+            minimumFractionDigits: 0, 
+            maximumFractionDigits: 0  
         }).format(numAmount);
     };
 
