@@ -153,8 +153,9 @@ const MotorAvailabilityCalendar = ({ motorId, onDateSelect }) => {
             onDateSelect && onDateSelect({ startDate: clickedDate.toISOString().split('T')[0], endDate: null, duration: 1 });
         } else if (selectedDates.startDate && !selectedDates.endDate) {
             // Melengkapi pilihan
-            const start = new Date(selectedDates.startDate.getFullYear(), selectedDates.startDate.getMonth(), selectedDates.startDate.getDate());
+            let start = new Date(selectedDates.startDate.getFullYear(), selectedDates.startDate.getMonth(), selectedDates.startDate.getDate());
             let end = clickedDate;
+
 
             // Jika tanggal akhir lebih kecil dari tanggal mulai, swap
             if (end < start) {
