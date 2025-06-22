@@ -215,10 +215,10 @@ const Pembayaran = () => {
                 if (window.confirm('Terima kasih! Bukti pembayaran Anda telah terkirim. Anda akan diarahkan ke WhatsApp untuk konfirmasi lebih lanjut dengan admin.')) {
                     window.open(waUrl, '_blank');
                     // Opsional: setelah WhatsApp, redirect kembali ke halaman utama atau riwayat reservasi
-                    navigate('/reservations-history'); // Atau halaman lain
+                    navigate('/'); // Atau halaman lain
                 } else {
                     // Jika user tidak ingin diarahkan ke WhatsApp
-                    navigate('/reservations-history'); // Atau halaman lain
+                    navigate('/'); // Atau halaman lain
                 }
 
             }, 500);
