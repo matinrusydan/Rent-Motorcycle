@@ -4,16 +4,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Sidebar from '../../components/admin/Sidebar.jsx';
-import Footer from '../../components/Footer.jsx'; // Sesuaikan path jika berbeda
+import Footer from '../../components/Footer.jsx'; 
 
-// CSS yang relevan (pastikan file-file ini ada dan berisi gaya yang dibutuhkan)
 import '../../assets/css/admin/dashboard.css';
 import '../../assets/css/admin/sidebar.css';
 import '../../assets/css/admin/pembayaranadmin.css';
 import '../../assets/css/global.css';
 
 const PembayaranAdmin = () => {
-    const [pembayaranList, setPembayaranList] = useState([]); // Hapus dummy data, inisialisasi kosong
+    const [pembayaranList, setPembayaranList] = useState([]); 
     const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
@@ -30,7 +29,7 @@ const PembayaranAdmin = () => {
         return import.meta.env.VITE_APP_API_URL || 'http://localhost:5000';
     };
 
-    // === START: Fungsionalitas SIDEBAR (Disalin dari ReservasiAdmin.jsx) ===
+  
     const [isSidebarToggled, setIsSidebarToggled] = useState(false);
 
     useEffect(() => {
@@ -44,14 +43,14 @@ const PembayaranAdmin = () => {
             else setIsSidebarToggled(false);
         };
         window.addEventListener('resize', handleResize);
-        handleResize(); // Panggil saat komponen dimuat
+        handleResize(); 
         return () => {
             window.removeEventListener('resize', handleResize);
         };
     }, [isSidebarToggled]);
 
 
-    // === START: FUNGSI UNTUK MENGAMBIL DATA PEMBAYARAN DARI BACKEND ===
+   
     const fetchPayments = useCallback(async () => {
         setLoading(true);
         try {
@@ -85,8 +84,7 @@ const PembayaranAdmin = () => {
 
     useEffect(() => {
         fetchPayments();
-    }, [refreshTrigger, fetchPayments]); // refreshTrigger dan fetchPayments sebagai dependency
-    // === END: FUNGSI UNTUK MENGAMBIL DATA PEMBAYARAN DARI BACKEND ===
+    }, [refreshTrigger, fetchPayments]);
 
 
     // Fungsi untuk memfilter data pembayaran di frontend

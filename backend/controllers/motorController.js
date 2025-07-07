@@ -1,6 +1,7 @@
 // backend/controllers/motorController.js
 const Motor = require('../models/Motor');
-const fs = require('fs').promises;
+const fs = require('fs'); // Menggunakan fs biasa untuk existsSync
+const fsp = require('fs').promises; // Menggunakan fs.promises untuk operasi async
 const path = require('path');
 const db = require('../config/db'); 
 
@@ -131,7 +132,7 @@ const getMotorAvailability = async (req, res) => {
 };
 
 const createMotor = async (req, res) => {
-    console.log('req.body in createMotor:', req.body); // Tambahkan ini
+    console.log('req.body in createMotor:', req.body);
     console.log('req.file in createMotor:', req.file); 
     try {
         // Asumsi `gambar_motor` adalah path file yang diupload oleh multer
@@ -149,8 +150,8 @@ const createMotor = async (req, res) => {
     } catch (error) {
         console.error('Error creating motor:', error);
         // Jika ada file yang diupload dan terjadi error, hapus file tersebut
-        if (req.file && fs.existsSync(req.file.path)) {
-            await fs.unlink(req.file.path);
+        if (req.file && fs.existsSync(req.file.path)) { // Menggunakan fs.existsSync (sync)
+            fs.unlinkSync(req.file.path); // Menggunakan fs.unlinkSync (sync)
         }
         res.status(500).json({
             success: false,
@@ -175,8 +176,11 @@ const updateMotor = async (req, res) => {
             if (oldMotor.gambar_motor && oldMotor.gambar_motor !== motorData.gambar_motor) {
                 const oldImagePath = path.join(__dirname, '..', oldMotor.gambar_motor);
                 try {
-                    await fs.unlink(oldImagePath);
-                    console.log('Old image deleted:', oldImagePath);
+                    // Gunakan fsp.access dan fsp.unlink untuk operasi async/await
+                    if (await fsp.access(oldImagePath).then(() => true).catch(() => false)) {
+                        await fsp.unlink(oldImagePath);
+                        console.log('Old image deleted:', oldImagePath);
+                    }
                 } catch (unlinkError) {
                     console.warn('Could not delete old image (might not exist):', oldImagePath, unlinkError.message);
                 }
@@ -200,8 +204,8 @@ const updateMotor = async (req, res) => {
     } catch (error) {
         console.error('Error updating motor:', error);
         // Jika ada file baru diupload dan terjadi error update, hapus file baru tersebut
-        if (req.file && fs.existsSync(req.file.path)) {
-            await fs.unlink(req.file.path);
+        if (req.file && fs.existsSync(req.file.path)) { // Menggunakan fs.existsSync (sync)
+            fs.unlinkSync(req.file.path); // Menggunakan fs.unlinkSync (sync)
         }
         res.status(500).json({
             success: false,
@@ -211,8 +215,29 @@ const updateMotor = async (req, res) => {
 };
 
 const deleteMotor = async (req, res) => {
+    let connection;
     try {
         const { id } = req.params;
+        connection = await db.getConnection(); // Get connection here
+
+        // 1. Periksa apakah ada reservasi terkait yang masih aktif/pending/confirmed
+        const [futureReservations] = await connection.execute(
+            `SELECT COUNT(id) AS count
+            FROM reservasi
+            WHERE motor_id = ?
+            AND status IN ('pending', 'confirmed')`, // Fokus pada reservasi yang belum selesai
+            [id]
+        );
+
+        if (futureReservations[0].count > 0) {
+            // Jika ada reservasi aktif/pending, tolak penghapusan
+            return res.status(400).json({ 
+                success: false, 
+                message: `Motor ini tidak dapat dihapus karena masih memiliki ${futureReservations[0].count} reservasi yang sedang berjalan atau menunggu konfirmasi. Mohon selesaikan atau batalkan reservasi tersebut terlebih dahulu.` 
+            });
+        }
+
+        // 2. Jika tidak ada reservasi aktif, lanjutkan penghapusan
         const motor = await Motor.getById(id); // Ambil data motor untuk mendapatkan path gambar
 
         if (!motor) {
@@ -225,10 +250,15 @@ const deleteMotor = async (req, res) => {
         if (motor.gambar_motor) {
             const imagePath = path.join(__dirname, '..', motor.gambar_motor);
             try {
-                await fs.unlink(imagePath);
-                console.log('Image deleted:', imagePath);
+                // Gunakan fsp.access dan fsp.unlink untuk operasi async/await
+                if (await fsp.access(imagePath).then(() => true).catch(() => false)) {
+                    await fsp.unlink(imagePath);
+                    console.log('Image deleted:', imagePath);
+                } else {
+                    console.warn('Image file not found for deletion:', imagePath);
+                }
             } catch (unlinkError) {
-                console.warn('Could not delete image file (might not exist):', imagePath, unlinkError.message);
+                console.warn('Could not delete image file (permission or other error):', imagePath, unlinkError.message);
             }
         }
 
@@ -242,41 +272,74 @@ const deleteMotor = async (req, res) => {
             success: false,
             message: `Failed to delete motor: ${error.message}`
         });
+    } finally {
+        if (connection) connection.release(); // Release connection in finally
     }
 };
 
 const bulkDeleteMotors = async (req, res) => {
+    let connection;
     try {
         const { ids } = req.body; // ids diharapkan berupa array ID motor
         if (!Array.isArray(ids) || ids.length === 0) {
             return res.status(400).json({ success: false, message: 'Invalid or empty array of IDs provided.' });
         }
 
-        // Ambil path gambar untuk semua motor yang akan dihapus
+        connection = await db.getConnection(); // Get connection here
+
         const motorsToDelete = [];
+        const motorsWithActiveReservations = [];
+
+        // Periksa setiap motor untuk reservasi aktif sebelum menghapus
         for (const id of ids) {
-            const motor = await Motor.getById(id);
-            if (motor && motor.gambar_motor) {
-                motorsToDelete.push(motor.gambar_motor);
+            const [futureReservations] = await connection.execute(
+                `SELECT COUNT(id) AS count FROM reservasi WHERE motor_id = ? AND status IN ('pending', 'confirmed')`,
+                [id]
+            );
+
+            if (futureReservations[0].count > 0) {
+                motorsWithActiveReservations.push(id);
+            } else {
+                const motor = await Motor.getById(id);
+                if (motor && motor.gambar_motor) {
+                    motorsToDelete.push({ id: motor.id, gambar_motor: motor.gambar_motor });
+                }
             }
         }
 
-        const affectedRows = await Motor.bulkDelete(ids);
+        if (motorsWithActiveReservations.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Tidak dapat menghapus motor dengan ID berikut: ${motorsWithActiveReservations.join(', ')}. Mereka masih memiliki reservasi aktif atau pending.`
+            });
+        }
+
+        const deleteIds = motorsToDelete.map(m => m.id);
+        if (deleteIds.length === 0) {
+             return res.status(200).json({ success: true, message: 'Tidak ada motor yang dapat dihapus.' });
+        }
+
+        const affectedRows = await Motor.bulkDelete(deleteIds);
 
         // Hapus file gambar yang terkait
-        for (const gambar_motor of motorsToDelete) {
-            const imagePath = path.join(__dirname, '..', gambar_motor);
+        for (const motor of motorsToDelete) {
+            const imagePath = path.join(__dirname, '..', motor.gambar_motor);
             try {
-                await fs.unlink(imagePath);
-                console.log('Bulk deleted image:', imagePath);
+                if (await fsp.access(imagePath).then(() => true).catch(() => false)) {
+                    await fsp.unlink(imagePath);
+                    console.log('Bulk deleted image:', imagePath);
+                } else {
+                    console.warn('Could not delete image file during bulk delete (might not exist):', imagePath, unlinkError.message);
+                }
             } catch (unlinkError) {
-                console.warn('Could not delete image file during bulk delete (might not exist):', imagePath, unlinkError.message);
+                console.warn('Could not delete image file during bulk delete (permission or other error):', imagePath, unlinkError.message);
             }
         }
 
         res.json({
             success: true,
-            message: `${affectedRows} motors deleted successfully.`
+            message: `${affectedRows} motor berhasil dihapus.`,
+            deletedCount: affectedRows
         });
     } catch (error) {
         console.error('Error in bulkDeleteMotors:', error);
@@ -284,6 +347,8 @@ const bulkDeleteMotors = async (req, res) => {
             success: false,
             message: `Failed to delete motors: ${error.message}`
         });
+    } finally {
+        if (connection) connection.release();
     }
 };
 
@@ -405,7 +470,6 @@ const getAvailableMotors = async (req, res) => {
             params.push(tanggal_mulai, tanggalSelesaiFormatted);
         }
 
-        // Urutkan berdasarkan brand dan type
         query += ' ORDER BY m.brand ASC, m.type ASC';
 
         console.log('Executing query:', query);
@@ -413,13 +477,12 @@ const getAvailableMotors = async (req, res) => {
 
         const [motors] = await connection.execute(query, params);
 
-        // Log untuk debugging
+
         console.log(`Found ${motors.length} available motors`);
         if (tanggal_mulai && lama_sewa) {
             console.log(`For period: ${tanggal_mulai} to ${tanggalSelesaiFormatted} (${lama_sewa} days)`);
         }
 
-        // Tambahkan informasi tambahan untuk setiap motor
         const motorsWithAvailability = motors.map(motor => ({
             ...motor,
             is_available_for_period: tanggal_mulai && lama_sewa ? true : null,
@@ -454,15 +517,13 @@ const getAvailableMotors = async (req, res) => {
 };
 
 const checkDateOverlap = (start1, end1, start2, end2) => {
-    // Konversi string tanggal ke Date object jika diperlukan
+
     const date1Start = new Date(start1);
     const date1End = new Date(end1);
     const date2Start = new Date(start2);
     const date2End = new Date(end2);
     
-    // Tidak ada overlap jika:
-    // - Periode 1 berakhir sebelum periode 2 dimulai, ATAU
-    // - Periode 2 berakhir sebelum periode 1 dimulai
+
     return !(date1End < date2Start || date2End < date1Start);
 };
 
@@ -474,7 +535,6 @@ const getMotorAvailabilityDetails = async (req, res) => {
 
         connection = await db.getConnection();
 
-        // Ambil detail motor
         const [motorResult] = await connection.execute(
             'SELECT * FROM motors WHERE id = ? AND status = "available"',
             [id]
@@ -489,7 +549,6 @@ const getMotorAvailabilityDetails = async (req, res) => {
 
         const motor = motorResult[0];
 
-        // Ambil semua reservasi untuk motor ini dalam rentang waktu tertentu
         let reservationQuery = `
             SELECT 
                 id,
@@ -512,7 +571,6 @@ const getMotorAvailabilityDetails = async (req, res) => {
 
         const [reservations] = await connection.execute(reservationQuery, queryParams);
 
-        // Tentukan apakah motor tersedia untuk periode yang diminta
         let isAvailable = true;
         if (start_date && end_date) {
             isAvailable = reservations.length === 0;
@@ -544,7 +602,7 @@ const getMotorAvailabilityDetails = async (req, res) => {
     }
 };
 
-// Tambahkan fungsi ini ke motorController.js untuk akses public
+
 
 const getAvailableMotorsPublic = async (req, res) => {
     let connection;
@@ -552,7 +610,6 @@ const getAvailableMotorsPublic = async (req, res) => {
         const { tanggal_mulai, lama_sewa, brand } = req.query;
         let tanggalSelesaiFormatted;
 
-        // Validasi input tanggal dan lama sewa (sama seperti versi admin)
         if (tanggal_mulai && lama_sewa) {
             const startDate = new Date(tanggal_mulai);
             const duration = parseInt(lama_sewa);
@@ -589,7 +646,6 @@ const getAvailableMotorsPublic = async (req, res) => {
 
         connection = await db.getConnection();
 
-        // Query untuk motor yang tersedia (PUBLIC - tanpa autentikasi)
         let query = `
             SELECT
                 m.id,
@@ -607,13 +663,11 @@ const getAvailableMotorsPublic = async (req, res) => {
         `;
         const params = [];
 
-        // Filter berdasarkan brand jika disediakan
         if (brand && brand !== 'all' && brand.trim() !== '') {
             query += ' AND LOWER(m.brand) = LOWER(?)';
             params.push(brand.trim());
         }
 
-        // Logika pengecekan overlap reservasi jika tanggal dan lama sewa disediakan
         if (tanggal_mulai && tanggalSelesaiFormatted) {
             query += `
                 AND m.id NOT IN (
@@ -658,12 +712,6 @@ const getAvailableMotorsPublic = async (req, res) => {
     }
 };
 
-// Export function yang baru
-module.exports = {
-    // ... existing exports
-    getAvailableMotorsPublic,
-    // ... other exports
-};
 
 module.exports = {
     getAllMotors,

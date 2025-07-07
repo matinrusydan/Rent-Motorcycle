@@ -197,8 +197,8 @@ const Pembayaran = () => {
             const response = await axios.post(`${getApiUrl()}/api/payments/upload-proof`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data', // Penting untuk upload file
-                    'Authorization': `Bearer ${token}`
-                },
+                        'Authorization': `Bearer ${token}`
+                    },
                 // OnUploadProgress bisa ditambahkan jika ingin menampilkan progress bar
             });
 
@@ -207,18 +207,16 @@ const Pembayaran = () => {
 
             // Redirect ke WhatsApp
             setTimeout(() => {
-                const phoneNumber = '6281234567890'; // Ganti dengan nomor WhatsApp admin Anda
+                const phoneNumber = '6281234567890'; 
                 const message = encodeURIComponent(`Halo, saya sudah melakukan pembayaran untuk reservasi ID ${reservationId}. Mohon dikonfirmasi. Terima kasih!`);
                 const waUrl = `https://wa.me/${phoneNumber}?text=${message}`;
 
                 // Konfirmasi dengan user sebelum redirect
                 if (window.confirm('Terima kasih! Bukti pembayaran Anda telah terkirim. Anda akan diarahkan ke WhatsApp untuk konfirmasi lebih lanjut dengan admin.')) {
                     window.open(waUrl, '_blank');
-                    // Opsional: setelah WhatsApp, redirect kembali ke halaman utama atau riwayat reservasi
-                    navigate('/'); // Atau halaman lain
+                    navigate('/'); 
                 } else {
-                    // Jika user tidak ingin diarahkan ke WhatsApp
-                    navigate('/'); // Atau halaman lain
+                    navigate('/');
                 }
 
             }, 500);
